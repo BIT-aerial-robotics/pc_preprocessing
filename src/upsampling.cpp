@@ -19,15 +19,13 @@
 
 using namespace std;
 
-int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, int w, int h, int c, int *nof) {
+int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, int w, int h, int c, int nof) {
   double Wp_x, Wp_y, Wp_z, Gr_x, Gr_y, Gr_z, Gs, S_x=0, S_y=0, S_z=0, Y_x=0, Y_y=0, Y_z=0;
   double mr_x=maxxyz.x, mr_y=maxxyz.y, mr_z=maxxyz.z;
-//  double c_ori_min[3];
-//
-//  cout << "c_ori_min, x:  " << c_ori_min[0] << endl;
-//  cout << "c_ori_min, y:  " << c_ori_min[1] << endl;
-//  cout << "c_ori_min, z:  " << c_ori_min[2] << endl;
 
+  cout << "minxyz, x:  " << minxyz.x << endl;
+  cout << "minxyz, y:  " << minxyz.y << endl;
+  cout << "minxyz, z:  " << minxyz.z << endl;
 
   sort(pc_array.begin(),pc_array.end(),compare_pc_v);
 
@@ -46,10 +44,9 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, in
   chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
 
   //cv::Mat image_upsample  = image.clone();//clone original image used for upsampling
-  cv::Mat image_upsample = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
+  cv::Mat image_upsample = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0)); //initialize the mat variable according to the size of image
 
-  //float* ima3d = (float*)malloc(sizeof(float)*(image_upsample.rows*image_upsample.cols*c));
-  //free(ima3d);
+  float* ima3d = (float*)malloc(sizeof(float)*(image_upsample.rows*image_upsample.cols*c));
 
   double maxima3d[3];
   //= {0.0f,0.0f,0.0f};
@@ -83,8 +80,8 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, in
               double pu = pc_array[k].u_px;
               double pv = pc_array[k].v_px;
               double dx = pc_array[k].x_3d;
-              double dy = pc_array[k].y_3d;
-              double dz = pc_array[k].z_3d;
+              double dy = pc_array[k].y_3d - minxyz.y;
+              double dz = pc_array[k].z_3d - minxyz.z;
               Gr_x = dx/mr_x;
               Gr_y = dy/mr_y;
               Gr_z = dz/mr_z;
@@ -123,17 +120,16 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, in
       if(maxima3d[1] < Dy_i ) (maxima3d[1] = Dy_i) ;
       if(maxima3d[2] < Dz_i ) (maxima3d[2] = Dz_i) ;
 
-//      ima3d[(v+minrow)*image_upsample.cols*3 + u*3] = Dx_i;
-//	  ima3d[(v+minrow)*image_upsample.cols*3 + u*3 +1] = Dy_i;
-//	  ima3d[(v+minrow)*image_upsample.cols*3 + u*3 +2] = Dz_i;
+      ima3d[(v+minrow)*image_upsample.cols*3 + u*3] = Dx_i;
+	  ima3d[(v+minrow)*image_upsample.cols*3 + u*3 +1] = Dy_i;
+	  ima3d[(v+minrow)*image_upsample.cols*3 + u*3 +2] = Dz_i;
 
    }
   }
 
 
   //unsigned long pu_ori_zone = 0, pv_ori_zone = 0;
-
-  /*cout << "test line" <<  endl;
+//cout << "test line" <<  endl;
 
   for(int vali = minrow; vali < maxrow; vali++)
 	  for(int uali = 0; uali < image_upsample.cols; uali++){
@@ -146,45 +142,36 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, in
 
   free(ima3d);
 
-//	double minv, maxv;
-//	cv::Point pt_min, pt_max;
-//	cv::minMaxLoc(image_upsample, &minv, &maxv);
-//	cout << "minv = " << minv << endl;
-//	cout << "idx_min = " << pt_min << endl;
-//	cout << "maxv = " << maxv << endl;
-//	cout << "idx_max = " << pt_max << endl;
-
   chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
   chrono::duration<double> time_used = chrono::duration_cast < chrono::duration < double >> (t2 - t1);
   cout << "Total time in upsampling: " << time_used.count() << " s." << endl;
 
   char pic0[50];
 
-  sprintf(pic0, "./savepic/%02dimage_upsample.png", *nof);
+  sprintf(pic0, "/tmp/%02dimage_upsample.png", nof);
   //cv::cvtColor(image_upsample, image_upsample_grey, cv::COLOR_BGR2GRAY);
   //cv::imshow("image_upsample", image_upsample_grey);
   cv::imshow("image_upsample", image_upsample);
-  cv::waitKey(0);
+  cv::imwrite(pic0, image_upsample); //save the image
+  cv::waitKey(1);
   cv::Mat channel[3];
   cv::split(image_upsample, channel);//split into three channels
 
- char pic1[50];
- char pic2[50];
- char pic3[50];
- sprintf(pic1, "./matlab 828/%02dupsamplesave_0.png",*nof);
- sprintf(pic2, "./matlab 828/%02dupsamplesave_1.png",*nof);
- sprintf(pic3, "./matlab 828/%02dupsamplesave_2.png",*nof);
- cv::imshow("x of image_upsample", channel[0]);
- cv::imwrite(pic1, channel[0]); //save the image
- cv::imshow("y of image_upsample", channel[1]);
- cv::imwrite(pic2, channel[1]); //save the image
- cv::imshow("z of image_upsample", channel[2]);
- cv::imwrite(pic3, channel[2]); //save the image
+  char pic1[50];
+  char pic2[50];
+  char pic3[50];
+  sprintf(pic1, "/tmp/%02dupsamplesave_0.png",nof);
+  sprintf(pic2, "/tmp/%02dupsamplesave_1.png",nof);
+  sprintf(pic3, "/tmp/%02dupsamplesave_2.png",nof);
+  cv::imshow("x of image_upsample", channel[0]);
+  cv::imwrite(pic1, channel[0]); //save the image
+  cv::imshow("y of image_upsample", channel[1]);
+  cv::imwrite(pic2, channel[1]); //save the image
+  cv::imshow("z of image_upsample", channel[2]);
+  cv::imwrite(pic3, channel[2]); //save the image
 
- *nof++;
-
-  cv::waitKey(0);
-  cv::destroyAllWindows();*/
+  cv::waitKey(1);
+  cv::destroyAllWindows();
   return 0;
 }
 

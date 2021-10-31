@@ -59,8 +59,10 @@ public:
 
 };
 
+
+
 bool compare_pc_v(const pointcoordinate& left,const pointcoordinate& right);
-int upsampling_pro(std::vector<pointcoordinate> &pc_array, pcl::PointXYZ &maxxyz,  int w, int h, int c, int *no);
+int upsampling_pro(std::vector<pointcoordinate> &pc_array, pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, int w, int h, int c, int no);
 
 #endif 
 
