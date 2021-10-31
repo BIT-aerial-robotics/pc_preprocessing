@@ -18,6 +18,30 @@
 #ifndef IMAGEBASICS_H_
 #define IMAGEBASICS_H_
 
+#include "ros/ros.h"
+#include "std_msgs/String.h"
+#include "sensor_msgs/PointCloud2.h"
+#include "sensor_msgs/Image.h"
+#include "pcl_conversions/pcl_conversions.h"
+#include "pcl/point_types.h"
+#include "pcl/PCLPointCloud2.h"
+#include "pcl/conversions.h"
+#include "pcl_ros/transforms.h"
+#include <vector>
+#include <sstream>
+#include <iostream>
+#include <algorithm>
+#include <fstream>
+#include <chrono>
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <Eigen/Dense>
+#include <image_transport/image_transport.h>
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
 class pointcoordinate
 {
 public:
@@ -29,17 +53,14 @@ public:
 
     void print()
     {
-        //std::cout << "3D coordinate of this point: [" << x_3d << "; " << y_3d << "; " << z_3d <<  "]" << std::endl;
-        //std::cout << "2D coordinate of this point in pixel frame: [" << u_px << "; " << v_px <<  "]" << std::endl;
-        
-    
-    
+        std::cout << "3D coordinate of this point: [" << x_3d << "; " << y_3d << "; " << z_3d <<  "]" << std::endl;
+        std::cout << "2D coordinate of this point in pixel frame: [" << u_px << "; " << v_px <<  "]" << std::endl;
     }
+
 };
 
-bool compare_pc_v(const pointcoordinate& left,const pointcoordinate& right){
-    return left.v_px<right.v_px; //ascending sort
-}
+bool compare_pc_v(const pointcoordinate& left,const pointcoordinate& right);
+int upsampling_pro(std::vector<pointcoordinate> &pc_array, pcl::PointXYZ &maxxyz,  int w, int h, int c, int *no);
 
 #endif 
 

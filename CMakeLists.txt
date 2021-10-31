@@ -11,9 +11,14 @@ find_package(catkin  REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  sensor_msgs
+  cv_bridge
+  image_transport
 )
 
 find_package( PCL REQUIRED )
+find_package(OpenCV REQUIRED)
+
  
 #add_definitions(${PCL_DEFINITIONS})
 
@@ -123,6 +128,7 @@ include_directories(
   include/pc_preprocessing
   ${catkin_INCLUDE_DIRS}
 ${PCL_INCLUDE_DIRS} 
+${OpenCV_LIBS}
 )
 
 ## Declare a C++ library
@@ -210,8 +216,12 @@ ${PCL_INCLUDE_DIRS}
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
-add_executable(pc_prep src/pc_preprocessing.cpp)
-target_link_libraries(pc_prep ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+set(PRE_SRC
+  src/upsampling.cpp
+ )
+
+add_executable(pc_prep ${PRE_SRC} src/pc_preprocessing.cpp)
+target_link_libraries(pc_prep ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 add_dependencies(pc_prep pc_preprocessing_generate_messages_cpp)
 
 
