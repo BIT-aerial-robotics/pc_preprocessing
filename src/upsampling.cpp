@@ -30,12 +30,12 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   sort(pc_array.begin(),pc_array.end(),compare_pc_v);
 
   int minrow = 0;
-  minrow = static_cast<int> (pc_array[0].v_px);  //the minimum v coordinate of the points
+  minrow = floor(pc_array[0].v_px);  //the minimum v coordinate of the points
   cout << "minrow:" << minrow << endl;
   //cout << "size of pc: " << pc_array.size() << endl;
 
   int maxrow = 0;
-  maxrow = static_cast<int> (pc_array.back().v_px);  //the minimum v coordinate of the points
+  maxrow = floor(pc_array.back().v_px) +1;  //the minimum v coordinate of the points
   cout << "maxrow:" << maxrow << endl;
 
 
@@ -46,7 +46,7 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   //cv::Mat image_upsample  = image.clone();//clone original image used for upsampling
   cv::Mat image_upsample = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0)); //initialize the mat variable according to the size of image
 
-  float* ima3d = (float*)malloc(sizeof(float)*(image_upsample.rows*image_upsample.cols*c));
+  double* ima3d = (double*)malloc(sizeof(double)*(image_upsample.rows*image_upsample.cols*c));
 
   double maxima3d[3];
   //= {0.0f,0.0f,0.0f};
@@ -59,7 +59,7 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   double Dz_i;
 
   int kin = 0;
-  int grid = 4;
+  int grid = 5;
   int sd = pc_array.size();
 
   for (int v=0; v<maxrow - minrow; v=v+1)
@@ -80,12 +80,14 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
               double pu = pc_array[k].u_px;
               double pv = pc_array[k].v_px;
               double dx = pc_array[k].x_3d;
-              double dy = pc_array[k].y_3d - minxyz.y;
-              double dz = pc_array[k].z_3d - minxyz.z;
+              //double dy = pc_array[k].y_3d - minxyz.y;
+              //double dz = pc_array[k].z_3d - minxyz.z;
+              double dy = pc_array[k].y_3d;
+              double dz = pc_array[k].z_3d;
               Gr_x = dx/mr_x;
               Gr_y = dy/mr_y;
               Gr_z = dz/mr_z;
-              Gs =  ( (u - pu)*(u - pu) + (v-pv)*(v-pv) );
+              Gs =  ( (u - pu)*(u - pu) + (v+ minrow-pv)*(v+ minrow-pv) );
               Wp_x = 1/sqrt(Gs*Gr_x);
               Wp_y = 1/sqrt(Gs*Gr_y);
               Wp_z = 1/sqrt(Gs*Gr_z);
@@ -135,9 +137,10 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
 	  for(int uali = 0; uali < image_upsample.cols; uali++){
           unsigned char *row_ptr = image_upsample.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
           unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
-          data_ptr[0] = static_cast<unsigned char>(255*ima3d[vali*image_upsample.cols*3 + uali*3]/maxima3d[0]);
-          data_ptr[1] = static_cast<unsigned char>(255*ima3d[vali*image_upsample.cols*3 + uali*3 + 1]/maxima3d[1]);
-          data_ptr[2] = static_cast<unsigned char>(255*ima3d[vali*image_upsample.cols*3 + uali*3 + 2]/maxima3d[2]);
+          //notice the order is B,G,R in opencv, and R,G,B in matlab
+          data_ptr[2] = (unsigned char)round(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3]/maxima3d[0]);
+          data_ptr[1] = (unsigned char)round(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3 + 1]/maxima3d[1]);
+          data_ptr[0] = (unsigned char)round(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3 + 2]/maxima3d[2]);
 	  }
 
   free(ima3d);
@@ -154,7 +157,7 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   cv::imshow("image_upsample", image_upsample);
   cv::imwrite(pic0, image_upsample); //save the image
   cv::waitKey(1);
-  cv::Mat channel[3];
+  /*cv::Mat channel[3];
   cv::split(image_upsample, channel);//split into three channels
 
   char pic1[50];
@@ -171,7 +174,7 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   cv::imwrite(pic3, channel[2]); //save the image
 
   cv::waitKey(1);
-  cv::destroyAllWindows();
+  cv::destroyAllWindows();*/
   return 0;
 }
 

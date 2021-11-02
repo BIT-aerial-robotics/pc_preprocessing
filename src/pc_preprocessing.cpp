@@ -31,7 +31,7 @@
 using namespace std;
 int w_img = 1280, h_img = 720, c_img =3;
 int i_pc_count = 0;
-int sum_pc = 4;
+int sum_pc = 5;
 int sum_pc_i = 0;
 long int pc_size = 0;
 pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -84,7 +84,7 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 
       	pointcoordinate thispoint;
 
-        if(  pix_pc[0] > 0  && (int)pix_pc[0] <= w_img &&  pix_pc[1] > 0  && (int)pix_pc[1] <= h_img){
+        if(  pix_pc[0] >= 1  && (int)pix_pc[0] <= w_img &&  pix_pc[1] >= 1  && (int)pix_pc[1] <= h_img){
           	thispoint.x_3d = cloud.points[i].x;
           	thispoint.y_3d = cloud.points[i].y;
           	thispoint.z_3d = cloud.points[i].z;
