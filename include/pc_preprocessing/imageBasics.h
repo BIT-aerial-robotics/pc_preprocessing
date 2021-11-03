@@ -59,10 +59,16 @@ public:
 
 };
 
-
+typedef struct
+{
+	double umax{0.0};
+	double umin{0.0};
+	double vmax{360.0};
+	double vmin{60.0};
+} minmaxuv_;
 
 bool compare_pc_v(const pointcoordinate& left,const pointcoordinate& right);
-int upsampling_pro(std::vector<pointcoordinate> &pc_array, pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, int w, int h, int c, int no);
+int upsampling_pro(std::vector<pointcoordinate> &pc_array, pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int no);
 
 #endif 
 

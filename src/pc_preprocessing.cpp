@@ -31,16 +31,25 @@
 using namespace std;
 int w_img = 1280, h_img = 720, c_img =3;
 int i_pc_count = 0;
-int sum_pc = 5;
+int sum_pc = 3;
 int sum_pc_i = 0;
 long int pc_size = 0;
 pcl::PointCloud<pcl::PointXYZ> cloud;
 vector<pointcoordinate> pc_array;
 pcl::PointXYZ point_max(0,0,0); //the maximum value of XYZ channels
 pcl::PointXYZ point_min(0,0,0); //the minimum value of XYZ channels
+//struct
+//{
+//	double umax{0.0};
+//	double umin{0.0};
+//	double vmax{0.0};
+//	double vmin{0.0};
+//} minmaxuv;
+minmaxuv_ minmaxuv;
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
+	chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
     ROS_INFO("pc received");
 
     //pcl::PointCloud<pcl::PointXYZ> cloud[sum_pc];
@@ -99,13 +108,18 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
             if  (thispoint.x_3d < point_min.x) { point_min.x = thispoint.x_3d; }
             if  (thispoint.y_3d < point_min.y) { point_min.y = thispoint.y_3d; }
             if  (thispoint.z_3d < point_min.z) { point_min.z = thispoint.z_3d; }
+
+            if  (thispoint.u_px > minmaxuv.umax) {minmaxuv.umax = thispoint.u_px;}
+            if  (thispoint.u_px < minmaxuv.umin) {minmaxuv.umin = thispoint.u_px; }
+            if  (thispoint.v_px > minmaxuv.vmax) {minmaxuv.vmax = thispoint.v_px;}
+            if  (thispoint.v_px < minmaxuv.vmin) {minmaxuv.vmin = thispoint.v_px;}
         }
     }
 
    if (sum_pc_i == sum_pc) {
        sum_pc_i = 0;
        cout << "array size: " << pc_array.size();
-       int ups = upsampling_pro(pc_array, point_max, point_min, w_img, h_img, c_img, i_pc_count);
+       int ups = upsampling_pro(pc_array, point_max, point_min, minmaxuv, w_img, h_img, c_img, i_pc_count);
        i_pc_count ++;
        pc_size = 0;
        pc_array.clear();
@@ -115,7 +129,15 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
        point_min.x = 0;
        point_min.y = 0;
        point_min.z = 0;
+       minmaxuv.umax = 600;
+       minmaxuv.umin = 600;
+       minmaxuv.vmax = 360;
+       minmaxuv.vmin = 60;
     }
+
+   chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+   chrono::duration<double> time_used = chrono::duration_cast < chrono::duration < double >> (t2 - t1);
+   cout << "preprocessing time: " << time_used.count() << " s." << endl;
 
 }
 
