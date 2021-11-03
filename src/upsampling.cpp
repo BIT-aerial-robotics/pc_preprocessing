@@ -32,12 +32,12 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   sort(pc_array.begin(),pc_array.end(),compare_pc_v); //time consuming
 
   //int minrow = floor(pc_array[0].v_px);  //the minimum v coordinate of the points
-  int minrow = (int)minmaxuv.vmin;
+  int minrow = floor(minmaxuv.vmin) +1;
   //cout << "minrow:" << minrow << endl;
   //cout << "size of pc: " << pc_array.size() << endl;
 
   //int maxrow = floor(pc_array.back().v_px) +1;  //the minimum v coordinate of the points
-  int maxrow = (int)minmaxuv.vmax;
+  int maxrow = (int)minmaxuv.vmax + 1;
   //cout << "maxrow:" << maxrow << endl;
 
   //cv::Mat image_upsample  = image.clone();//clone original image used for upsampling
@@ -56,7 +56,7 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   double Dz_i;
 
   int kin = 0;
-  int grid = 4;
+  int grid = 5;
   int sd = pc_array.size();
 
   for (int v=0; v< maxrow - minrow; v=v+1)
@@ -77,10 +77,10 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
               double pu = pc_array[k].u_px;
               double pv = pc_array[k].v_px;
               double dx = pc_array[k].x_3d;
-              double dy = pc_array[k].y_3d - minxyz.y;
-              double dz = pc_array[k].z_3d - minxyz.z;
-//              double dy = pc_array[k].y_3d;
-//              double dz = pc_array[k].z_3d;
+//              double dy = pc_array[k].y_3d - minxyz.y;
+//              double dz = pc_array[k].z_3d - minxyz.z;
+              double dy = pc_array[k].y_3d;
+              double dz = pc_array[k].z_3d;
               Gr_x = dx/mr_x;
               Gr_y = dy/mr_y;
               Gr_z = dz/mr_z;
@@ -135,9 +135,9 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
           unsigned char *row_ptr = image_upsample.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
           unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
           //notice the order is B,G,R in opencv, and R,G,B in matlab
-          data_ptr[2] = (unsigned char)round(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3]/maxima3d[0]);
-          data_ptr[1] = (unsigned char)round(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3 + 1]/maxima3d[1]);
-          data_ptr[0] = (unsigned char)round(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3 + 2]/maxima3d[2]);
+          data_ptr[2] = (unsigned char)(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3]/maxima3d[0]);
+          data_ptr[1] = (unsigned char)(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3 + 1]/maxima3d[1]);
+          data_ptr[0] = (unsigned char)(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3 + 2]/maxima3d[2]);
 	  }
 
   free(ima3d);

@@ -31,7 +31,7 @@
 using namespace std;
 int w_img = 1280, h_img = 720, c_img =3;
 int i_pc_count = 0;
-int sum_pc = 2;
+int sum_pc = 3;
 int sum_pc_i = 0;
 long int pc_size = 0;
 pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -74,8 +74,6 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 //    ROS_INFO("cloud size: %d",cloud.points.size());
 //
 //    ROS_INFO("x: %f", cloud.points[0].x);
-
-
 
    for (int i=0; i< cloud.points.size(); i++){
     	Eigen::VectorXd pc_i(4);
