@@ -32,12 +32,12 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   sort(pc_array.begin(),pc_array.end(),compare_pc_v); //time consuming
 
   //int minrow = floor(pc_array[0].v_px);  //the minimum v coordinate of the points
-  int minrow = floor(minmaxuv.vmin) +1;
+  int minrow = floor(minmaxuv.vmin) + 1;
   //cout << "minrow:" << minrow << endl;
   //cout << "size of pc: " << pc_array.size() << endl;
 
   //int maxrow = floor(pc_array.back().v_px) +1;  //the minimum v coordinate of the points
-  int maxrow = (int)minmaxuv.vmax + 1;
+  int maxrow = (int)minmaxuv.vmax +1;
   //cout << "maxrow:" << maxrow << endl;
 
   //cv::Mat image_upsample  = image.clone();//clone original image used for upsampling
@@ -77,10 +77,10 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
               double pu = pc_array[k].u_px;
               double pv = pc_array[k].v_px;
               double dx = pc_array[k].x_3d;
-//              double dy = pc_array[k].y_3d - minxyz.y;
-//              double dz = pc_array[k].z_3d - minxyz.z;
-              double dy = pc_array[k].y_3d;
-              double dz = pc_array[k].z_3d;
+              double dy = pc_array[k].y_3d - minxyz.y;
+              double dz = pc_array[k].z_3d - minxyz.z;
+//              double dy = pc_array[k].y_3d;
+//              double dz = pc_array[k].z_3d;
               Gr_x = dx/mr_x;
               Gr_y = dy/mr_y;
               Gr_z = dz/mr_z;

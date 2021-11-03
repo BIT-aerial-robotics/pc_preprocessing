@@ -161,7 +161,7 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "pc_preprocessing");
   ros::NodeHandle n;
 
-  ros::Subscriber subpc = n.subscribe("/livox/lidar", 5, pc2Callback);
+  ros::Subscriber subpc = n.subscribe("/livox/lidar", 50, pc2Callback);
   ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 50, imgCallback);
 
   ros::spin();
