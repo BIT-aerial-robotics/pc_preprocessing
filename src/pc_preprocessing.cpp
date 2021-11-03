@@ -31,6 +31,7 @@
 using namespace std;
 int w_img = 1280, h_img = 720, c_img =3;
 int i_pc_count = 0;
+int i_img_count = 0;
 int sum_pc = 3;
 int sum_pc_i = 0;
 long int pc_size = 0;
@@ -148,8 +149,13 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
     //cv::Mat img = cv::Mat(170, 500, CV_8UC3, cv::Scalar(0, 0, 0));
 
 	//cv::Mat img;
-	cv::imshow("image", img);
-	cv::waitKey(1);
+	// cv::imshow("image", img);
+	// cv::waitKey(1);
+    char img1[50];
+    sprintf(img1, "/tmp/%02dimg.png",i_img_count);
+    cv::imwrite(img1, img); //save the image
+    i_img_count ++;
+
 	w_img = img.cols;
 	h_img = img.rows;
 	c_img = img.channels();
@@ -161,8 +167,8 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "pc_preprocessing");
   ros::NodeHandle n;
 
-  ros::Subscriber subpc = n.subscribe("/livox/lidar", 50, pc2Callback);
-  ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 50, imgCallback);
+  ros::Subscriber subpc = n.subscribe("/livox/lidar", 1000, pc2Callback);
+  ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1000, imgCallback);
 
   ros::spin();
 

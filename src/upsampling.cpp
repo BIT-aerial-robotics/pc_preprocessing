@@ -135,9 +135,9 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
           unsigned char *row_ptr = image_upsample.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
           unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
           //notice the order is B,G,R in opencv, and R,G,B in matlab
-          data_ptr[2] = (unsigned char)(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3]/maxima3d[0]);
-          data_ptr[1] = (unsigned char)(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3 + 1]/maxima3d[1]);
-          data_ptr[0] = (unsigned char)(255.0d*ima3d[vali*image_upsample.cols*3 + uali*3 + 2]/maxima3d[2]);
+          data_ptr[2] = (unsigned char)(255.0*ima3d[vali*image_upsample.cols*3 + uali*3]/maxima3d[0]);
+          data_ptr[1] = (unsigned char)(255.0*ima3d[vali*image_upsample.cols*3 + uali*3 + 1]/maxima3d[1]);
+          data_ptr[0] = (unsigned char)(255.0*ima3d[vali*image_upsample.cols*3 + uali*3 + 2]/maxima3d[2]);
 	  }
 
   free(ima3d);
@@ -163,14 +163,14 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   sprintf(pic1, "/tmp/%02dupsamplesave_0.png",nof);
   sprintf(pic2, "/tmp/%02dupsamplesave_1.png",nof);
   sprintf(pic3, "/tmp/%02dupsamplesave_2.png",nof);
-  cv::imshow("x of image_upsample", channel[0]);
+  // cv::imshow("x of image_upsample", channel[0]);
   cv::imwrite(pic1, channel[0]); //save the image
-  cv::imshow("y of image_upsample", channel[1]);
+  // cv::imshow("y of image_upsample", channel[1]);
   cv::imwrite(pic2, channel[1]); //save the image
-  cv::imshow("z of image_upsample", channel[2]);
+  // cv::imshow("z of image_upsample", channel[2]);
   cv::imwrite(pic3, channel[2]); //save the image
 
-  cv::waitKey(1);
+  // cv::waitKey(1);
   cv::destroyAllWindows();
   return 0;
 }
