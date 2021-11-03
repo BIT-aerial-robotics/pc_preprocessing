@@ -31,7 +31,7 @@
 using namespace std;
 int w_img = 1280, h_img = 720, c_img =3;
 int i_pc_count = 0;
-int sum_pc = 3;
+int sum_pc = 2;
 int sum_pc_i = 0;
 long int pc_size = 0;
 pcl::PointCloud<pcl::PointXYZ> cloud;
