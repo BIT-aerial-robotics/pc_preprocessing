@@ -47,6 +47,7 @@ pcl::PointXYZ point_min(0,0,0); //the minimum value of XYZ channels
 //	double vmin{0.0};
 //} minmaxuv;
 minmaxuv_ minmaxuv;
+cv::Mat img;
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -132,7 +133,11 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
        minmaxuv.umin = 600;
        minmaxuv.vmax = 360;
        minmaxuv.vmin = 60;
-    }
+
+       char img1[50];
+       sprintf(img1, "/tmp/%02dimg.png",i_pc_count);
+       cv::imwrite(img1, img); //save the image
+     }
 
    chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
    chrono::duration<double> time_used = chrono::duration_cast < chrono::duration < double >> (t2 - t1);
@@ -145,16 +150,16 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
 	cv_bridge::CvImagePtr cv_ptr;
     cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
-    const cv::Mat img = cv_ptr -> image;
-    //cv::Mat img = cv::Mat(170, 500, CV_8UC3, cv::Scalar(0, 0, 0));
+    //cv::Mat img  = cv_ptr -> image;
+    img  = cv_ptr -> image;
 
 	//cv::Mat img;
 	// cv::imshow("image", img);
 	// cv::waitKey(1);
-    char img1[50];
-    sprintf(img1, "/tmp/%02dimg.png",i_img_count);
-    cv::imwrite(img1, img); //save the image
-    i_img_count ++;
+//    char img1[50];
+//    sprintf(img1, "/tmp/%02dimg.png",i_img_count);
+//    cv::imwrite(img1, img); //save the image
+//    i_img_count ++;
 
 	w_img = img.cols;
 	h_img = img.rows;
