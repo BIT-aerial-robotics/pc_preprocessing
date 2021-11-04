@@ -37,6 +37,7 @@ int sum_pc_i = 0;
 long int pc_size = 0;
 pcl::PointCloud<pcl::PointXYZ> cloud;
 vector<pointcoordinate> pc_array;
+vector<pointcoordinate> pc_array_grid[896000];
 pcl::PointXYZ point_max(0,0,0); //the maximum value of XYZ channels
 pcl::PointXYZ point_min(0,0,0); //the minimum value of XYZ channels
 //struct
@@ -153,8 +154,7 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
     //cv::Mat img  = cv_ptr -> image;
     img  = cv_ptr -> image;
 
-	//cv::Mat img;
-	// cv::imshow("image", img);
+ 	// cv::imshow("image", img);
 	// cv::waitKey(1);
 //    char img1[50];
 //    sprintf(img1, "/tmp/%02dimg.png",i_img_count);
