@@ -74,10 +74,10 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
          double pu = pc_array_grid[gridno][i_g].u_px;
          double pv = pc_array_grid[gridno][i_g].v_px;
          double dx = pc_array_grid[gridno][i_g].x_3d;
-//         double dy = pc_array_grid[gridno][i_g].y_3d - minxyz.y;
-//         double dz = pc_array_grid[gridno][i_g].z_3d - minxyz.z;
-         double dy = pc_array_grid[gridno][i_g].y_3d;
-         double dz = pc_array_grid[gridno][i_g].z_3d;
+         double dy = pc_array_grid[gridno][i_g].y_3d - minxyz.y;
+         double dz = pc_array_grid[gridno][i_g].z_3d - minxyz.z;
+//         double dy = pc_array_grid[gridno][i_g].y_3d;
+//         double dz = pc_array_grid[gridno][i_g].z_3d;
 
          Gr_x = dx/mr_x;
          Gr_y = dy/mr_y;
