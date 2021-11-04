@@ -37,7 +37,7 @@ int sum_pc_i = 0;
 long int pc_size = 0;
 pcl::PointCloud<pcl::PointXYZ> cloud;
 vector<pointcoordinate> pc_array;
-vector<pointcoordinate> pc_array_grid[896000];
+vector<pointcoordinate> pc_array_grid[921600];
 pcl::PointXYZ point_max(0,0,0); //the maximum value of XYZ channels
 pcl::PointXYZ point_min(0,0,0); //the minimum value of XYZ channels
 //struct
@@ -60,8 +60,8 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
     sum_pc_i ++;
     pc_size += cloud.points.size();
 
-    ROS_INFO("cloud.width: %d", cloud.width);
-    ROS_INFO("cloud.height: %d", cloud.height); //if height ==1, it is 1-D point cloud
+   // ROS_INFO("cloud.width: %d", cloud.width);
+    //ROS_INFO("cloud.height: %d", cloud.height); //if height ==1, it is 1-D point cloud
     //ROS_INFO("cloud size: %d",cloud.points.size());
 
 //    vector<pcl::PointXYZ> data;
@@ -78,6 +78,7 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 //
 //    ROS_INFO("x: %f", cloud.points[0].x);
 
+   int grid = 5;
    for (int i=0; i< cloud.points.size(); i++){
     	Eigen::VectorXd pc_i(4);
     	Eigen::MatrixXd T_pc_ima(4,4);
@@ -94,13 +95,13 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 
       	pointcoordinate thispoint;
 
-        if(  pix_pc[0] >= 1  && (int)pix_pc[0] <= w_img &&  pix_pc[1] >= 1  && (int)pix_pc[1] <= h_img){
+        if(  pix_pc[0] >= 1  && (int)pix_pc[0] <= w_img-1 &&  pix_pc[1] >= 1  && (int)pix_pc[1] < h_img -1){
           	thispoint.x_3d = cloud.points[i].x;
           	thispoint.y_3d = cloud.points[i].y;
           	thispoint.z_3d = cloud.points[i].z;
           	thispoint.u_px = pix_pc[0];
           	thispoint.v_px = pix_pc[1];
-          	pc_array.push_back(thispoint);
+          	//pc_array.push_back(thispoint);
 
             if  (thispoint.x_3d > point_max.x) { point_max.x = thispoint.x_3d; }
             if  (thispoint.y_3d > point_max.y) { point_max.y = thispoint.y_3d; }
@@ -114,16 +115,26 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
             if  (thispoint.u_px < minmaxuv.umin) {minmaxuv.umin = thispoint.u_px; }
             if  (thispoint.v_px > minmaxuv.vmax) {minmaxuv.vmax = thispoint.v_px;}
             if  (thispoint.v_px < minmaxuv.vmin) {minmaxuv.vmin = thispoint.v_px;}
+
+            for (int u = pix_pc[0]- grid; u < pix_pc[0] + grid; u++)
+            	for (int v = pix_pc[1]- grid; v < pix_pc[1] + grid ; v++){
+            		pc_array_grid[v*w_img+u].push_back(thispoint);
+            	}
         }
     }
 
    if (sum_pc_i == sum_pc) {
        sum_pc_i = 0;
-       cout << "array size: " << pc_array.size();
-       int ups = upsampling_pro(pc_array, point_max, point_min, minmaxuv, w_img, h_img, c_img, i_pc_count);
+       cout << "array size: " << pc_array.size() << endl;
+       int ups = upsampling_pro(point_max, point_min, minmaxuv, w_img, h_img, c_img, i_pc_count);
        i_pc_count ++;
        pc_size = 0;
-       pc_array.clear();
+      // pc_array.clear();
+      /* for (int u = minmaxuv.umin  - grid; u < minmaxuv.umax  + grid; u++)
+           for (int v = minmaxuv.vmin  - grid; v < minmaxuv.vmax + grid; v++){
+                pc_array_grid[v*w_img+u].clear();
+           }*/
+
        point_max.x = 0;
        point_max.y = 0;
        point_max.z = 0;
@@ -172,7 +183,7 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "pc_preprocessing");
   ros::NodeHandle n;
 
-  ros::Subscriber subpc = n.subscribe("/livox/lidar", 1000, pc2Callback);
+  ros::Subscriber subpc = n.subscribe("/livox/lidar", 50, pc2Callback);
   ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1000, imgCallback);
 
   ros::spin();

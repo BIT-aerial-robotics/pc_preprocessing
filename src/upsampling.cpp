@@ -18,8 +18,9 @@
 #include "imageBasics.h"
 
 using namespace std;
+extern vector<pointcoordinate> pc_array_grid[921600];
 
-int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int nof) {
+int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int nof) {
 	// Use std::chrono to time the algorithm
   chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
   double Wp_x, Wp_y, Wp_z, Gr_x, Gr_y, Gr_z, Gs, S_x=0, S_y=0, S_z=0, Y_x=0, Y_y=0, Y_z=0;
@@ -29,7 +30,7 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
   cout << "minxyz, y:  " << minxyz.y << endl;
   cout << "minxyz, z:  " << minxyz.z << endl;*/
 
-  sort(pc_array.begin(),pc_array.end(),compare_pc_v); //time consuming
+  //sort(pc_array.begin(),pc_array.end(),compare_pc_v); //time consuming
 
   //int minrow = floor(pc_array[0].v_px);  //the minimum v coordinate of the points
   int minrow = floor(minmaxuv.vmin) + 1;
@@ -57,7 +58,7 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
 
   int kin = 0;
   int grid = 5;
-  int sd = pc_array.size();
+  //int sd = pc_array.size();
 
   for (int v=0; v< maxrow - minrow; v=v+1)
   {
@@ -67,45 +68,32 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
 	   S_y=0; Y_y=0;
 	   S_z=0; Y_z=0;
 
-       for (int k=kin; k<sd; k=k+1)
-       {
-          if( pc_array[k].v_px <= v + minrow -grid) { kin=k; }
-          if( pc_array[k].v_px >= v + minrow +grid) { break; }
+	   long int gridno = (v+minrow)*w+u;
+	   int s_g = pc_array_grid[gridno].size();
+	   for (int i_g = 0; i_g < s_g; i_g ++){
+         double pu = pc_array_grid[gridno][i_g].u_px;
+         double pv = pc_array_grid[gridno][i_g].v_px;
+         double dx = pc_array_grid[gridno][i_g].x_3d;
+//         double dy = pc_array_grid[gridno][i_g].y_3d - minxyz.y;
+//         double dz = pc_array_grid[gridno][i_g].z_3d - minxyz.z;
+         double dy = pc_array_grid[gridno][i_g].y_3d;
+         double dz = pc_array_grid[gridno][i_g].z_3d;
 
-          if ( pc_array[k].u_px > u-grid && pc_array[k].u_px < u+grid && pc_array[k].v_px > v+ minrow -grid && pc_array[k].v_px < v+ minrow +grid )
-          {
-              double pu = pc_array[k].u_px;
-              double pv = pc_array[k].v_px;
-              double dx = pc_array[k].x_3d;
-              double dy = pc_array[k].y_3d - minxyz.y;
-              double dz = pc_array[k].z_3d - minxyz.z;
-//              double dy = pc_array[k].y_3d;
-//              double dz = pc_array[k].z_3d;
-              Gr_x = dx/mr_x;
-              Gr_y = dy/mr_y;
-              Gr_z = dz/mr_z;
-              Gs =  ( (u - pu)*(u - pu) + (v+ minrow-pv)*(v+ minrow-pv) );
-              Wp_x = 1/sqrt(Gs*Gr_x);
-              Wp_y = 1/sqrt(Gs*Gr_y);
-              Wp_z = 1/sqrt(Gs*Gr_z);
-              S_x = S_x + Wp_x;
-              S_y = S_y + Wp_y;
-              S_z = S_z + Wp_z;
-              Y_x = Y_x + Wp_x*dx;
-              Y_y = Y_y + Wp_y*dy;
-              Y_z = Y_z + Wp_z*dz;
-
-//              Gr = x[k+2*sd]/mr;
-//              //Gs =  sqrt( (u - x[k])*(u - x[k]) + (v+dim[0]-x[k+sd])*(v+dim[0]-x[k+sd]) );
-//              Gs =  ( (u - x[k])*(u - x[k]) + (v+dim[0]-x[k+sd])*(v+dim[0]-x[k+sd]) );
-//              WGain = 1/sqrt(Gs*Gr);
-//              //mexPrintf("Filter Gain = %f\n",WGain);
-//              S = S + WGain;
-//              Y = Y + WGain*(x[k+2*sd]);
-          }
-       }
-//      if (S==0) {S=1;}
-//      y[u*(int)dim[1]  + v] = Y/S;
+         Gr_x = dx/mr_x;
+         Gr_y = dy/mr_y;
+         Gr_z = dz/mr_z;
+         Gs =  ( (u - pu)*(u - pu) + (v+ minrow-pv)*(v+ minrow-pv) );
+         Wp_x = 1/sqrt(Gs*Gr_x);
+         Wp_y = 1/sqrt(Gs*Gr_y);
+         Wp_z = 1/sqrt(Gs*Gr_z);
+         S_x = S_x + Wp_x;
+         S_y = S_y + Wp_y;
+         S_z = S_z + Wp_z;
+         Y_x = Y_x + Wp_x*dx;
+         Y_y = Y_y + Wp_y*dy;
+         Y_z = Y_z + Wp_z*dz;
+	  }
+	  pc_array_grid[gridno].clear();
 
       if (S_x==0) {S_x=1;}
       if (S_y==0) {S_y=1;}
@@ -119,25 +107,20 @@ int upsampling_pro(vector<pointcoordinate> &pc_array,  pcl::PointXYZ &maxxyz, pc
       if(maxima3d[1] < Dy_i ) (maxima3d[1] = Dy_i) ;
       if(maxima3d[2] < Dz_i ) (maxima3d[2] = Dz_i) ;
 
-      ima3d[(v+minrow)*image_upsample.cols*3 + u*3] = Dx_i;
-	  ima3d[(v+minrow)*image_upsample.cols*3 + u*3 +1] = Dy_i;
-	  ima3d[(v+minrow)*image_upsample.cols*3 + u*3 +2] = Dz_i;
-
+      ima3d[(v+minrow)*image_upsample.cols*c + u*c] = Dx_i;
+	  ima3d[(v+minrow)*image_upsample.cols*c + u*c +1] = Dy_i;
+	  ima3d[(v+minrow)*image_upsample.cols*c + u*c +2] = Dz_i;
    }
   }
-
-
-  //unsigned long pu_ori_zone = 0, pv_ori_zone = 0;
-//cout << "test line" <<  endl;
 
   for(int vali = minrow; vali < maxrow; vali++)
 	  for(int uali = (int)minmaxuv.umin; uali < (int)minmaxuv.umax; uali++){
           unsigned char *row_ptr = image_upsample.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
           unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
           //notice the order is B,G,R in opencv, and R,G,B in matlab
-          data_ptr[2] = (unsigned char)(255.0*ima3d[vali*image_upsample.cols*3 + uali*3]/maxima3d[0]);
-          data_ptr[1] = (unsigned char)(255.0*ima3d[vali*image_upsample.cols*3 + uali*3 + 1]/maxima3d[1]);
-          data_ptr[0] = (unsigned char)(255.0*ima3d[vali*image_upsample.cols*3 + uali*3 + 2]/maxima3d[2]);
+          data_ptr[2] = (unsigned char)(255.0*ima3d[vali*image_upsample.cols*c + uali*c]/maxima3d[0]);
+          data_ptr[1] = (unsigned char)(255.0*ima3d[vali*image_upsample.cols*c + uali*c + 1]/maxima3d[1]);
+          data_ptr[0] = (unsigned char)(255.0*ima3d[vali*image_upsample.cols*c + uali*c + 2]/maxima3d[2]);
 	  }
 
   free(ima3d);
