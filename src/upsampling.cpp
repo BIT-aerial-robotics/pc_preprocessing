@@ -74,8 +74,8 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
          double pu = pc_array_grid[gridno][i_g].u_px;
          double pv = pc_array_grid[gridno][i_g].v_px;
          double dx = pc_array_grid[gridno][i_g].x_3d;
-         double dy = pc_array_grid[gridno][i_g].y_3d - minxyz.y;
-         double dz = pc_array_grid[gridno][i_g].z_3d - minxyz.z;
+         double dy = abs(pc_array_grid[gridno][i_g].y_3d);
+         double dz = abs(pc_array_grid[gridno][i_g].z_3d);
 //         double dy = pc_array_grid[gridno][i_g].y_3d;
 //         double dz = pc_array_grid[gridno][i_g].z_3d;
 
@@ -94,6 +94,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
          Y_z = Y_z + Wp_z*dz;
 	  }
 	  pc_array_grid[gridno].clear();
+	  //vector <pointcoordinate>().swap(pc_array_grid[gridno]);
 
       if (S_x==0) {S_x=1;}
       if (S_y==0) {S_y=1;}
