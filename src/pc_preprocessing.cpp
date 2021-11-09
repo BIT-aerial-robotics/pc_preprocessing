@@ -79,17 +79,19 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 //    ROS_INFO("x: %f", cloud.points[0].x);
 
    int grid = 5;
+   Eigen::VectorXd pc_i(4);
+       	Eigen::MatrixXd T_pc_ima(4,4);
+       	T_pc_ima <<
+       	649.145832480000,	-527.021077203120,	-103.253274120000,	268.290316440000,
+       	242.802673396000,	-25.6337212953540,	-585.644625159000,	68.5356940330000,
+       	0.980644000000000,	0.000526794000000000,	-0.195801000000000,	0.283747000000000,
+       	0,	0,	0,	1; //from calibration
+
+       	Eigen::VectorXd pix_pc(4);
+
    for (int i=0; i< cloud.points.size(); i++){
-    	Eigen::VectorXd pc_i(4);
-    	Eigen::MatrixXd T_pc_ima(4,4);
-    	T_pc_ima <<
-    	649.145832480000,	-527.021077203120,	-103.253274120000,	268.290316440000,
-    	242.802673396000,	-25.6337212953540,	-585.644625159000,	68.5356940330000,
-    	0.980644000000000,	0.000526794000000000,	-0.195801000000000,	0.283747000000000,
-    	0,	0,	0,	1; //from calibration
-    	pc_i<< cloud.points[i].x, cloud.points[i].y, cloud.points[i].z, 1;
-    	Eigen::VectorXd pix_pc(4);
-    	pix_pc = T_pc_ima*pc_i;
+	    pc_i<< cloud.points[i].x, cloud.points[i].y, cloud.points[i].z, 1;
+	    pix_pc = T_pc_ima*pc_i;
     	pix_pc[0] = pix_pc[0]/pix_pc[2];
     	pix_pc[1] = pix_pc[1]/pix_pc[2];
 
@@ -107,9 +109,9 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
             if  (thispoint.y_3d > point_max.y) { point_max.y = thispoint.y_3d; }
             if  (thispoint.z_3d > point_max.z) { point_max.z = thispoint.z_3d; }
 
-            if  (thispoint.x_3d < point_min.x) { point_min.x = thispoint.x_3d; }
-            if  (thispoint.y_3d < point_min.y) { point_min.y = thispoint.y_3d; }
-            if  (thispoint.z_3d < point_min.z) { point_min.z = thispoint.z_3d; }
+//            if  (thispoint.x_3d < point_min.x) { point_min.x = thispoint.x_3d; }
+//            if  (thispoint.y_3d < point_min.y) { point_min.y = thispoint.y_3d; }
+//            if  (thispoint.z_3d < point_min.z) { point_min.z = thispoint.z_3d; }
 
             if  (thispoint.u_px > minmaxuv.umax) {minmaxuv.umax = thispoint.u_px;}
             if  (thispoint.u_px < minmaxuv.umin) {minmaxuv.umin = thispoint.u_px; }
@@ -148,7 +150,7 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 
        char img1[50];
        sprintf(img1, "/tmp/%02dimg.png",i_pc_count);
-       cv::imwrite(img1, img); //save the image
+       //cv::imwrite(img1, img); //save the image
      }
 
    chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
