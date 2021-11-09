@@ -63,9 +63,9 @@ typedef struct
 {
 	double umax{0.0};
 	double umin{0.0};
-	double vmax{360.0};
+	double vmax{0.0};
 	double vmin{60.0};
-} minmaxuv_;
+} minmaxuv_;  //the initial value should be carefully configured.
 
 bool compare_pc_v(const pointcoordinate& left,const pointcoordinate& right);
 int upsampling_pro(pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int no);
