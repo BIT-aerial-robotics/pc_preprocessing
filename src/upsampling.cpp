@@ -93,8 +93,8 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
          Y_y = Y_y + Wp_y*dy;
          Y_z = Y_z + Wp_z*dz;
 	  }
-	   //pc_array_grid[gridno].clear();
-	  vector <pointcoordinate>().swap(pc_array_grid[gridno]);
+	  pc_array_grid[gridno].clear();
+	  //vector <pointcoordinate>().swap(pc_array_grid[gridno]);
 
       if (S_x==0) {S_x=1;}
       if (S_y==0) {S_y=1;}
