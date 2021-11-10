@@ -29,7 +29,8 @@
 #include "imageBasics.h"
 
 using namespace std;
-int w_img = 1280, h_img = 720, c_img =3;
+//int w_img = 1280, h_img = 720, c_img =3;
+int w_img = 672, h_img = 376, c_img =3; //1105 dataset
 int i_pc_count = 0;
 int i_img_count = 0;
 int sum_pc = 2;
@@ -37,7 +38,9 @@ int sum_pc_i = 0;
 long int pc_size = 0;
 pcl::PointCloud<pcl::PointXYZ> cloud;
 vector<pointcoordinate> pc_array;
-vector<pointcoordinate> pc_array_grid[921600];
+//vector<pointcoordinate> pc_array_grid[921600];
+vector<pointcoordinate> pc_array_grid[252672];
+//vector<pointcoordinate> pc_array_grid[w_img*h_img];
 pcl::PointXYZ point_max(0,0,0); //the maximum value of XYZ channels
 pcl::PointXYZ point_min(0,0,0); //the minimum value of XYZ channels
 //struct
@@ -49,6 +52,8 @@ pcl::PointXYZ point_min(0,0,0); //the minimum value of XYZ channels
 //} minmaxuv;
 minmaxuv_ minmaxuv;
 cv::Mat img;
+vector<geometry_msgs::PoseStamped>  pose_series;
+geometry_msgs::PoseStamped  pose_global;
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -81,17 +86,24 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
    int grid = 5;
    Eigen::VectorXd pc_i(4);
        	Eigen::MatrixXd T_pc_ima(4,4);
-       	T_pc_ima <<
-       	649.145832480000,	-527.021077203120,	-103.253274120000,	268.290316440000,
-       	242.802673396000,	-25.6337212953540,	-585.644625159000,	68.5356940330000,
-       	0.980644000000000,	0.000526794000000000,	-0.195801000000000,	0.283747000000000,
-       	0,	0,	0,	1; //from calibration
+//       	T_pc_ima <<
+//       	649.145832480000,	-527.021077203120,	-103.253274120000,	268.290316440000,
+//       	242.802673396000,	-25.6337212953540,	-585.644625159000,	68.5356940330000,
+//       	0.980644000000000,	0.000526794000000000,	-0.195801000000000,	0.283747000000000,
+//       	0,	0,	0,	1; //from calibration
+
+       	    	T_pc_ima <<
+       			339.772898240000,	-263.502373294560,	-54.6615525600000,	138.543236720000,
+       			128.756166698000,	-12.8129096926770,	-294.290820079500,	36.3959495165000,
+       			0.980644000000000,	0.000526794000000000,	-0.195801000000000,	0.283747000000000,
+       			0,	0,	0,	1; //1105
 
        	Eigen::VectorXd pix_pc(4);
 
    for (int i=0; i< cloud.points.size(); i++){
 	    pc_i<< cloud.points[i].x, cloud.points[i].y, cloud.points[i].z, 1;
 	    pix_pc = T_pc_ima*pc_i;
+
     	pix_pc[0] = pix_pc[0]/pix_pc[2];
     	pix_pc[1] = pix_pc[1]/pix_pc[2];
 
@@ -118,24 +130,36 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
             if  (thispoint.v_px > minmaxuv.vmax) {minmaxuv.vmax = thispoint.v_px;}
             if  (thispoint.v_px < minmaxuv.vmin) {minmaxuv.vmin = thispoint.v_px;}
 
-            for (int u = pix_pc[0]- grid; u < pix_pc[0] + grid; u++)
-            	for (int v = pix_pc[1]- grid; v < pix_pc[1] + grid ; v++){
+            int test = max(2, 4);
+            for (int u = max( (int)(pix_pc[0]- grid), 0); u < min ( (int)(pix_pc[0] + grid), w_img); u++)
+            	for (int v = max( (int)( pix_pc[1]- grid), 0);  v < min ( (int)(pix_pc[1] + grid), h_img); v++){
             		pc_array_grid[v*w_img+u].push_back(thispoint);
             	}
+
+//            for (int u = 0; u < w_img; u++)
+//                 for (int v = 0; v < h_img; v++){
+//                	 pc_array_grid[v*w_img+u].push_back(thispoint);
+//                 }
+            //cout << "u_px: " << pix_pc[0] << ". v: " << pix_pc[1] << endl;
         }
     }
 
    if (sum_pc_i == sum_pc) {
        sum_pc_i = 0;
-       cout << "array size: " << pc_array.size() << endl;
+       //cout << "array size: " << pc_array.size() << endl;
        int ups = upsampling_pro(point_max, point_min, minmaxuv, w_img, h_img, c_img, i_pc_count);
        i_pc_count ++;
        pc_size = 0;
-      // pc_array.clear();
-      /* for (int u = minmaxuv.umin  - grid; u < minmaxuv.umax  + grid; u++)
-           for (int v = minmaxuv.vmin  - grid; v < minmaxuv.vmax + grid; v++){
-                pc_array_grid[v*w_img+u].clear();
-           }*/
+       //pc_array.clear();
+//      for (int u = minmaxuv.umin  - grid; u < minmaxuv.umax  + grid; u++)
+//           for (int v = minmaxuv.vmin  - grid; v < minmaxuv.vmax + grid; v++){
+//                pc_array_grid[v*w_img+u].clear();
+//           }
+
+//      for (int u = 0; u < w_img; u++)
+//           for (int v = 0; v < h_img; v++){
+//                pc_array_grid[v*w_img+u].clear();
+//           }
 
        point_max.x = 0;
        point_max.y = 0;
@@ -143,14 +167,14 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
        point_min.x = 0;
        point_min.y = 0;
        point_min.z = 0;
-       minmaxuv.umax = 600;
-       minmaxuv.umin = 600;
-       minmaxuv.vmax = 360;
+       minmaxuv.umax = w_img/2;
+       minmaxuv.umin = 40;
+       minmaxuv.vmax = h_img/2;
        minmaxuv.vmin = 60;
 
        char img1[50];
        sprintf(img1, "/tmp/%02dimg.png",i_pc_count);
-       //cv::imwrite(img1, img); //save the image
+       cv::imwrite(img1, img); //save the image
      }
 
    chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
@@ -180,13 +204,23 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
     ROS_INFO("image width: %d, height: %d, channels: %d.", w_img, h_img, c_img);
 }
 
+void poseCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg)
+{
+	 geometry_msgs::PoseStamped posek;
+
+	 posek = *msg;
+	 pose_series.push_back(posek);
+	 pose_global.pose = msg->pose;
+}
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "pc_preprocessing");
   ros::NodeHandle n;
 
-  ros::Subscriber subpc = n.subscribe("/livox/lidar", 50, pc2Callback);
+  ros::Subscriber subpc = n.subscribe("/livox/lidar", 500, pc2Callback);
   ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1000, imgCallback);
+  ros::Subscriber subpos = n.subscribe("/mavros/local_position/pose", 1000, poseCallback);
 
   ros::spin();
 

@@ -22,6 +22,9 @@
 #include "std_msgs/String.h"
 #include "sensor_msgs/PointCloud2.h"
 #include "sensor_msgs/Image.h"
+#include "geometry_msgs/PoseStamped.h"
+#include "tf2_ros/buffer.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include "pcl_conversions/pcl_conversions.h"
 #include "pcl/point_types.h"
 #include "pcl/PCLPointCloud2.h"
@@ -63,9 +66,9 @@ typedef struct
 {
 	double umax{0.0};
 	double umin{0.0};
-	double vmax{360.0};
+	double vmax{0.0};
 	double vmin{60.0};
-} minmaxuv_;
+} minmaxuv_;  //the initial value should be carefully configured.
 
 bool compare_pc_v(const pointcoordinate& left,const pointcoordinate& right);
 int upsampling_pro(pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int no);
