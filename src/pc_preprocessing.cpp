@@ -148,7 +148,7 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
        sum_pc_i = 0;
        //cout << "array size: " << pc_array.size() << endl;
        int ups = upsampling_pro(point_max, point_min, minmaxuv, w_img, h_img, c_img, i_pc_count);
-       i_pc_count ++;
+      //  i_pc_count ++;
        pc_size = 0;
        //pc_array.clear();
 //      for (int u = minmaxuv.umin  - grid; u < minmaxuv.umax  + grid; u++)
@@ -175,6 +175,7 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
        char img1[50];
        sprintf(img1, "/tmp/%02dimg.png",i_pc_count);
        cv::imwrite(img1, img); //save the image
+       i_pc_count ++;
      }
 
    chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
