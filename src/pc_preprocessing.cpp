@@ -54,6 +54,7 @@ minmaxuv_ minmaxuv;
 cv::Mat img;
 vector<geometry_msgs::PoseStamped>  pose_series;
 geometry_msgs::PoseStamped  pose_global;
+double feat_point[2] = {300,150}; //the feature position in the pixel frame, detected by the detector
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -214,6 +215,16 @@ void poseCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg)
 	 pose_global.pose = msg->pose;
 }
 
+void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
+{
+	 geometry_msgs::TwistStamped velk;
+
+	 velk = *msg;
+
+
+	 //calculate the 3d coordinate of the feature point
+}
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "pc_preprocessing");
@@ -222,6 +233,7 @@ int main(int argc, char **argv)
   ros::Subscriber subpc = n.subscribe("/livox/lidar", 500, pc2Callback);
   ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1000, imgCallback);
   ros::Subscriber subpos = n.subscribe("/mavros/local_position/pose", 1000, poseCallback);
+  ros::Subscriber subvel = n.subscribe("/mavros/local_position/velocity_body", 1000, velCallback);
 
   ros::spin();
 
