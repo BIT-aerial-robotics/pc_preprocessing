@@ -232,6 +232,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 	    		  sum_x =  pc_array_grid[v*w_img+u][i_pc].x_3d + sum_x;
 	    		  sum_no++;
 	    	  }
+	 feat_point[2] = sum_x/sum_no;
 	 sum_no  = 0;
 	 sum_x = 0;
 
