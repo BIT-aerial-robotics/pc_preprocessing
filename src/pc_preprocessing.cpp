@@ -225,7 +225,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      int w_img = 3;
      double sum_x = 0;
      int sum_no = 0; // the total points near the feature point
-	 //calculate the 3d coordinate of the feature point
+	 //calculate the x coordinate of the feature point
 	 for (int u =   (int)(feat_point[0]- grid_ave); u <   (int)(feat_point[0]- grid_ave); u++)
 	      for (int v =   (int)(feat_point[1]- grid_ave); v < (int)(feat_point[1]- grid_ave); v++)
 	    	  for (int i_pc =  0; i_pc < pc_array_grid[v*w_img+u].size(); i_pc++){
@@ -235,6 +235,10 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 	 feat_point[2] = sum_x/sum_no;
 	 sum_no  = 0;
 	 sum_x = 0;
+
+	 double fx, fy, cx, cy; //
+
+
 
 }
 
