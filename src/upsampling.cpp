@@ -19,6 +19,9 @@
 
 using namespace std;
 extern vector<pointcoordinate> pc_array_grid[921600];
+extern double feat_point[2]; //the feature position in the pixel frame, detected by the detector
+extern vector<pointcoordinate> pc_array_feature; //put the feature points in the array
+
 
 int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int nof) {
 	// Use std::chrono to time the algorithm
@@ -93,6 +96,16 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
          Y_y = Y_y + Wp_y*dy;
          Y_z = Y_z + Wp_z*dz;
 	  }
+
+	   int grid_ave = 50;
+
+	   for (int u =   (int)(feat_point[0]- grid_ave); u <   (int)(feat_point[0]+ grid_ave); u++)
+	   	      for (int v =   (int)(feat_point[1]- grid_ave); v < (int)(feat_point[1] + grid_ave); v++)
+	   	    	  for (int i_pc =  0; i_pc < pc_array_grid[v*w+u].size(); i_pc++){
+	   	    		pc_array_feature.push_back(pc_array_grid[v*w+u][i_pc]);
+
+	   	    	  }
+
 	  pc_array_grid[gridno].clear();
 	  //vector <pointcoordinate>().swap(pc_array_grid[gridno]);
 

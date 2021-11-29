@@ -55,6 +55,7 @@ cv::Mat img;
 vector<geometry_msgs::PoseStamped>  pose_series;
 geometry_msgs::PoseStamped  pose_global;
 double feat_point[2] = {300,150}; //the feature position in the pixel frame, detected by the detector
+vector<pointcoordinate> pc_array_feature; //put the feature points in the array
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -221,25 +222,61 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 
 	 velk = *msg;
 
-     int grid_ave = 5;
+     int grid_ave = 50;
      int w_img = 3;
      double sum_x = 0;
      int sum_no = 0; // the total points near the feature point
 	 //calculate the x coordinate of the feature point
-	 for (int u =   (int)(feat_point[0]- grid_ave); u <   (int)(feat_point[0]- grid_ave); u++)
-	      for (int v =   (int)(feat_point[1]- grid_ave); v < (int)(feat_point[1]- grid_ave); v++)
+	 for (int u =   (int)(feat_point[0]- grid_ave); u <   (int)(feat_point[0]+ grid_ave); u++)
+	      for (int v =   (int)(feat_point[1]- grid_ave); v < (int)(feat_point[1] + grid_ave); v++)
 	    	  for (int i_pc =  0; i_pc < pc_array_grid[v*w_img+u].size(); i_pc++){
 	    		  sum_x =  pc_array_grid[v*w_img+u][i_pc].x_3d + sum_x;
 	    		  sum_no++;
 	    	  }
-	 feat_point[2] = sum_x/sum_no;
+	 double x_f_l = sum_x/sum_no;
 	 sum_no  = 0;
 	 sum_x = 0;
 
+	 cout << "feature point in LiDAR frame, x coordinate: " << x_f_l << endl;
+	 int ii = feat_point[1]*w_img+feat_point[0];
+	 cout << " pc_array_grid[v*w_img+u].size(): " << pc_array_grid[ii].size()  << endl;
+
+     /*projection matrix:
+	 264	0	343.760000000000
+	 0	263.700000000000	183.879500000000
+	 0	0	1 */
+
+     /*lidar to cam matrix:
+     0.0101012000000000	-0.998801000000000	0.0479053000000000	0.155312000000000
+-0.195541000000000	-0.0489563000000000	-0.979473000000000	-0.0598381000000000
+0.980644000000000	0.000526794000000000	-0.195801000000000	0.283747000000000
+0	0	0	1
+      */
+
 	 double fx, fy, cx, cy; //
+	 Eigen::Matrix3d fp_tra(3,3);   //see notebook
+     fp_tra << (feat_point[0]-343.76)/264,   0.998801000000000,  -0.0479053000000000,
+    		 (feat_point[1] -183.8795)/263.70,   0.0489563000000000,  0.979473000000000,
+                  1,   -0.000526794000000000,  0.195801000000000;
 
+     Eigen::Vector3d fp_vec(3);
+     Eigen::Vector3d r1(3);
+     r1 <<  0.0101012000000000,  -0.195541000000000,  0.980644000000000;
+     Eigen::Vector3d t_c_L;
+	 t_c_L <<  0.155312000000000, -0.0598381000000000,  0.283747000000000;
+     fp_vec = x_f_l*r1 + t_c_L;
+     Eigen::Vector3d v_mi;
+     v_mi = fp_tra.inverse()*fp_vec;
 
+     double z_f_c = v_mi(0);
+     double x_f_c = (feat_point[0] - 343.76)* z_f_c /264;
+     double y_f_c = (feat_point[1] - 183.8795)* z_f_c /263.700;
+     Eigen::Vector3d p_f_L, p_f_c;
+     p_f_L << x_f_l, v_mi(1), v_mi(2);
+     p_f_c << x_f_c, y_f_c, z_f_c;
 
+     cout << "feature point in LiDAR frame: " << p_f_L(0)  << p_f_L(1)  << p_f_L(2)  << endl;
+     cout << "feature point in camera frame: " << p_f_c(0)  << p_f_c(1)  << p_f_c(2)  << endl;
 }
 
 int main(int argc, char **argv)
