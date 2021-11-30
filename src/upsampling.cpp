@@ -63,6 +63,14 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   int grid = 5;
   //int sd = pc_array.size();
 
+  pc_array_feature.clear();
+  int grid_ave = 1;
+  for (int u =   (int)(feat_point[0]- grid_ave); u <   (int)(feat_point[0]+ grid_ave); u++)
+	      for (int v =   (int)(feat_point[1]- grid_ave); v < (int)(feat_point[1] + grid_ave); v++)
+	    	  for (int i_pc =  0; i_pc < pc_array_grid[v*w+u].size(); i_pc++){
+	    		  pc_array_feature.push_back(pc_array_grid[v*w+u][i_pc]);
+	    	  }
+
   for (int v=0; v< maxrow - minrow; v=v+1)
   {
    for (int u= (int)minmaxuv.umin; u< (int)minmaxuv.umax; u=u+1)
@@ -96,17 +104,12 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
          Y_y = Y_y + Wp_y*dy;
          Y_z = Y_z + Wp_z*dz;
 
-  	     int grid_ave = 50;
-
-  	     if( u > (int)(feat_point[0]- grid_ave) &&  u <   (int)(feat_point[0]+ grid_ave) &&
+  	     /*if( u > (int)(feat_point[0]- grid_ave) &&  u <   (int)(feat_point[0]+ grid_ave) &&
   	   	       v + minrow >   (int)(feat_point[1]- grid_ave) && v + minrow < (int)(feat_point[1] + grid_ave))
-  	   	    	  {
-  	   	    		pc_array_feature.push_back(pc_array_grid[gridno][i_g]);
-
-  	   	    	  }
+  	   	       {
+                   pc_array_feature.push_back(pc_array_grid[gridno][i_g]);
+  	   	       }*/
 	  }
-
-
 
 	  pc_array_grid[gridno].clear();
 	  //vector <pointcoordinate>().swap(pc_array_grid[gridno]);

@@ -227,19 +227,28 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      double sum_x = 0;
      int sum_no = 0; // the total points near the feature point
 	 //calculate the x coordinate of the feature point
-	 for (int u =   (int)(feat_point[0]- grid_ave); u <   (int)(feat_point[0]+ grid_ave); u++)
+	 /*for (int u =   (int)(feat_point[0]- grid_ave); u <   (int)(feat_point[0]+ grid_ave); u++)
 	      for (int v =   (int)(feat_point[1]- grid_ave); v < (int)(feat_point[1] + grid_ave); v++)
 	    	  for (int i_pc =  0; i_pc < pc_array_grid[v*w_img+u].size(); i_pc++){
 	    		  sum_x =  pc_array_grid[v*w_img+u][i_pc].x_3d + sum_x;
 	    		  sum_no++;
-	    	  }
+	    	  }*/
+
+     for (int i_pc =  0; i_pc < pc_array_feature.size(); i_pc++){
+     	    		  sum_x = pc_array_feature[i_pc].x_3d + sum_x;
+     	    		  sum_no++;
+     	    	  }
+     if (pc_array_feature.size() == 0){
+    	 cerr << "No point near the feature region." << endl;
+    	 sum_no = 1;
+     }
 	 double x_f_l = sum_x/sum_no;
 	 sum_no  = 0;
 	 sum_x = 0;
 
-	 cout << "feature point in LiDAR frame, x coordinate: " << x_f_l << endl;
+	 //cout << "feature point in LiDAR frame, x coordinate: " << x_f_l << endl;
 	 int ii = feat_point[1]*w_img+feat_point[0];
-	 cout << " pc_array_grid[v*w_img+u].size(): " << pc_array_grid[ii].size()  << endl;
+	 cout << "Count of point near the feature region: " << pc_array_feature.size() << endl;
 
      /*projection matrix:
 	 264	0	343.760000000000
@@ -275,8 +284,8 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      p_f_L << x_f_l, v_mi(1), v_mi(2);
      p_f_c << x_f_c, y_f_c, z_f_c;
 
-     cout << "feature point in LiDAR frame: " << p_f_L(0)  << p_f_L(1)  << p_f_L(2)  << endl;
-     cout << "feature point in camera frame: " << p_f_c(0)  << p_f_c(1)  << p_f_c(2)  << endl;
+     cout << "feature point in LiDAR frame: " << p_f_L(0)  << ", " << p_f_L(1)  << ", "   << p_f_L(2)  << endl;
+     cout << "feature point in camera frame: " << p_f_c(0)  << ", "  << p_f_c(1) << ", "  << p_f_c(2)  << endl;
 }
 
 int main(int argc, char **argv)
