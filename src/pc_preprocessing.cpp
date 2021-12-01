@@ -286,6 +286,39 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 
      cout << "feature point in LiDAR frame: " << p_f_L(0)  << ", " << p_f_L(1)  << ", "   << p_f_L(2)  << endl;
      cout << "feature point in camera frame: " << p_f_c(0)  << ", "  << p_f_c(1) << ", "  << p_f_c(2)  << endl;
+
+/*
+     G_T = [eye(3,3), t_est*eye(3,3); zeros(3,3), eye(3,3)]; %state transition matrix
+     H_T = [0.5*t_est*t_est*eye(3,3); t_est*eye(3,3)];  %input matrix
+     C_T = [eye(3,3), zeros(3,3)]; %output matrix
+
+     k_input = round(k*t_est/t_input);
+     if k_input > size_T_input
+         u_k = u_array_noise(1:3, end);
+     else
+         u_k = u_array_noise(1:3, k_input);
+     end
+
+     k_ob = round(k*t_est/t_ob_global);
+     if k_ob > size_T_ob
+         z_k = z_array(1:3, end);
+     elseif k_ob ==0
+         z_k = z_array(1:3, 1);
+     else
+         z_k = z_array(1:3, k_ob);
+     end
+
+     x_k_k_1 = G_T*x_k_k + H_T* u_k;
+     P_k_k_1 = G_T*P_k_k*G_T' + H_T*R*H_T';
+
+     y = z_k -C_T*x_k_k_1;
+     S=C_T*P_k_k_1*C_T'+ Q; %observation
+     K=P_k_k_1*C_T'*inv(S);
+     x_k_k=x_k_k_1+K*y;
+     P_k_k=(eye(6,6)-K*C_T)*P_k_k_1;
+     x_array_est(:,k)=x_k_k;
+     */
+     Eigen::Vector3d  G_T, H_T, C_T;
 }
 
 int main(int argc, char **argv)
