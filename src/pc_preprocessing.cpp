@@ -56,6 +56,7 @@ vector<geometry_msgs::PoseStamped>  pose_series;
 geometry_msgs::PoseStamped  pose_global;
 double feat_point[2] = {300,150}; //the feature position in the pixel frame, detected by the detector
 vector<pointcoordinate> pc_array_feature; //put the feature points in the array
+Eigen::Vector3d x_k_k;
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -318,7 +319,23 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      P_k_k=(eye(6,6)-K*C_T)*P_k_k_1;
      x_array_est(:,k)=x_k_k;
      */
-     Eigen::Vector3d  G_T, H_T, C_T;
+     Eigen::Matrix3d  eye3, G_T, H_T, C_T;
+     Eigen::Vector3d omega_s; //angular velocity of the sensor relative to earth, rotation matrix of sensor relative to earth frame.
+     double deltat = 0.01;
+     eye3  <<1, 0, 0,
+    		 0, 1, 0,
+			 0, 0, 1;
+     Eigen::Matrix3d omega_s_hat, R_s_E;
+	 omega_s_hat << 0, -omega_s(3), omega_s(2),
+    		 omega_s(3), 0, -omega_s(1),
+             -omega_s(2), omega_s(1), 0;
+
+     G_T =  -deltat*omega_s_hat+eye3;
+     H_T = -deltat*R_s_E;
+     C_T = eye3;
+     Eigen::Vector3d  u_k = p_f_L;
+     x_k_k = G_T*x_k_k + H_T* u_k;
+
 }
 
 int main(int argc, char **argv)
