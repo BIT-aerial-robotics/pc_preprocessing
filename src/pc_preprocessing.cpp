@@ -322,10 +322,14 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      Eigen::Matrix3d  eye3, G_T, H_T, C_T;
      Eigen::Vector3d omega_s; //angular velocity of the sensor relative to earth, rotation matrix of sensor relative to earth frame.
      double deltat = 0.01;
-     eye3  <<1, 0, 0,
-    		 0, 1, 0,
-			 0, 0, 1;
+     eye3.setIdentity();
+
      Eigen::Matrix3d omega_s_hat, R_s_E;
+
+     Eigen::Quaterniond q_3(pose_global.pose.orientation.w,pose_global.pose.orientation.x ,pose_global.pose.orientation.y,pose_global.pose.orientation.z);
+     q_3.normalize();
+     R_s_E = q_3.toRotationMatrix();
+
 	 omega_s_hat << 0, -omega_s(3), omega_s(2),
     		 omega_s(3), 0, -omega_s(1),
              -omega_s(2), omega_s(1), 0;
