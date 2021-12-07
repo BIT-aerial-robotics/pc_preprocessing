@@ -57,6 +57,7 @@ geometry_msgs::PoseStamped  pose_global;
 double feat_point[2] = {300,150}; //the feature position in the pixel frame, detected by the detector
 vector<pointcoordinate> pc_array_feature; //put the feature points in the array
 Eigen::Vector3d x_k_k;
+Eigen::Matrix3d P_k_k;
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -325,6 +326,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      eye3.setIdentity();
 
      Eigen::Matrix3d omega_s_hat, R_s_E;
+     Eigen::Matrix3d  R_variance, Q_rariance, S, K;
 
      Eigen::Quaterniond q_3(pose_global.pose.orientation.w,pose_global.pose.orientation.x ,pose_global.pose.orientation.y,pose_global.pose.orientation.z);
      q_3.normalize();
@@ -339,7 +341,15 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      C_T = eye3;
      Eigen::Vector3d  u_k = p_f_L;
      x_k_k = G_T*x_k_k + H_T* u_k;
+     P_k_k = G_T*P_k_k*G_T.transpose() + H_T*R_variance*H_T.transpose();
 
+     Eigen::Vector3d y, z_k;
+
+     y = z_k - C_T*x_k_k;
+     S=C_T*P_k_k*C_T.transpose() + Q_rariance; //observation
+     K = P_k_k*C_T.transpose()*S.inverse();
+     x_k_k = x_k_k + K*y;
+     P_k_k=( eye3 -K*C_T)*P_k_k;
 }
 
 int main(int argc, char **argv)
