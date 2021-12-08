@@ -215,7 +215,8 @@ void poseCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg)
 
 	 posek = *msg;
 	 pose_series.push_back(posek);
-	 pose_global.pose = msg->pose;
+	// pose_global.pose = msg->pose;
+	 pose_global = *msg;
 }
 
 void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
@@ -321,12 +322,15 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      x_array_est(:,k)=x_k_k;
      */
      Eigen::Matrix3d  eye3, G_T, H_T, C_T;
-     Eigen::Vector3d omega_s; //angular velocity of the sensor relative to earth, rotation matrix of sensor relative to earth frame.
+     Eigen::Vector3d omega_s,  v_s; //angular velocity of the sensor relative to earth, and the velocity relative to earth
      double deltat = 0.01;
      eye3.setIdentity();
+     omega_s << velk.twist.angular.x, velk.twist.angular.y, velk.twist.angular.z;
+     v_s << velk.twist.linear.x, velk.twist.linear.y, velk.twist.linear.z;
 
-     Eigen::Matrix3d omega_s_hat, R_s_E;
-     Eigen::Matrix3d  R_variance, Q_rariance, S, K;
+     Eigen::Matrix3d omega_s_hat, R_s_E;  //rotation matrix of sensor relative to earth frame.
+     Eigen::Matrix3d  R_variance, Q_rariance;
+     Eigen::Matrix3d  S, K;
 
      Eigen::Quaterniond q_3(pose_global.pose.orientation.w,pose_global.pose.orientation.x ,pose_global.pose.orientation.y,pose_global.pose.orientation.z);
      q_3.normalize();
@@ -337,19 +341,22 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
              -omega_s(2), omega_s(1), 0;
 
      G_T =  -deltat*omega_s_hat+eye3;
-     H_T = -deltat*R_s_E;
+     H_T = -deltat*R_s_E.transpose();
      C_T = eye3;
-     Eigen::Vector3d  u_k = p_f_L;
+     Eigen::Vector3d  u_k = R_s_E*v_s;  //the velocity of sensor frame relative to the earth frame, in the earth frame
      x_k_k = G_T*x_k_k + H_T* u_k;
      P_k_k = G_T*P_k_k*G_T.transpose() + H_T*R_variance*H_T.transpose();
 
      Eigen::Vector3d y, z_k;
 
+     z_k = p_f_c; //output from yolov3
      y = z_k - C_T*x_k_k;
      S=C_T*P_k_k*C_T.transpose() + Q_rariance; //observation
      K = P_k_k*C_T.transpose()*S.inverse();
      x_k_k = x_k_k + K*y;
      P_k_k=( eye3 -K*C_T)*P_k_k;
+
+     cout << "After Kalman filter: " << x_k_k(0)  << ", " << x_k_k(1)  << ", "   << x_k_k(2)  << endl;
 }
 
 int main(int argc, char **argv)
