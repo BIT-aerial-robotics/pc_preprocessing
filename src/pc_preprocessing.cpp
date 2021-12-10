@@ -349,6 +349,9 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
              -omega_s(2), omega_s(1), 0;
 
 	 Eigen::Matrix3d p_hat;
+	 p_hat << 0, -p_f_c(3), p_f_c(2),
+			 p_f_c(3), 0, -p_f_c(1),
+			 -p_f_c(2), p_f_c(1), 0;
 
      G_T =  -deltat*omega_s_hat+eye3;
      Eigen::MatrixXd   H_T;
