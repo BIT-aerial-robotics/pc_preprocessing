@@ -57,7 +57,7 @@ geometry_msgs::PoseStamped  pose_global;
 double feat_point[2] = {300,150}; //the feature position in the pixel frame, detected by the detector
 vector<pointcoordinate> pc_array_feature; //put the feature points in the array
 Eigen::Vector3d x_k_k;
-Eigen::Matrix3d P_k_k;
+Eigen::Matrix3d P_k_k = Eigen::Matrix3d::Zero();
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -323,14 +323,14 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      */
      Eigen::Matrix3d  eye3, G_T, C_T;
      Eigen::Vector3d omega_s,  v_s; //angular velocity of the sensor relative to earth, and the velocity relative to earth
-     double deltat = 0.01;
+     double deltat = 0.0333333;  //sampling time
      eye3.setIdentity();
      omega_s << velk.twist.angular.x, velk.twist.angular.y, velk.twist.angular.z;
      v_s << velk.twist.linear.x, velk.twist.linear.y, velk.twist.linear.z;
 
      Eigen::Matrix3d omega_s_hat, R_s_E;  //rotation matrix of sensor relative to earth frame.
-     Eigen::Matrix3d  Q_rariance;
-     Eigen::MatrixXd R_variance;
+     Eigen::Matrix3d  Q_variance;  //covariance of feature position in the sensor frame
+     Eigen::MatrixXd R_variance;  //covariance of angular velocity and linear velocity
      R_variance  <<  0, 0, 0, 0, 0, 0,
     		 0, 0, 0, 0, 0, 0,
 			 0, 0, 0, 0, 0, 0,
@@ -339,7 +339,6 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 			 0, 0, 0, 0, 0, 0;
 
      Eigen::Matrix3d  S, K;
-
      Eigen::Quaterniond q_3(pose_global.pose.orientation.w,pose_global.pose.orientation.x ,pose_global.pose.orientation.y,pose_global.pose.orientation.z);
      q_3.normalize();
      R_s_E = q_3.toRotationMatrix();
@@ -349,9 +348,9 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
              -omega_s(2), omega_s(1), 0;
 
 	 Eigen::Matrix3d p_hat;
-	 p_hat << 0, -p_f_c(3), p_f_c(2),
-			 p_f_c(3), 0, -p_f_c(1),
-			 -p_f_c(2), p_f_c(1), 0;
+	 p_hat << 0, -x_k_k(3), x_k_k(2),
+			 x_k_k(3), 0, -x_k_k(1),
+			 -x_k_k(2), x_k_k(1), 0;
 
      G_T =  -deltat*omega_s_hat+eye3;
      Eigen::MatrixXd   H_T;
@@ -367,7 +366,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 
      z_k = p_f_c; //output from yolov3
      y = z_k - C_T*x_k_k;
-     S=C_T*P_k_k*C_T.transpose() + Q_rariance; //observation
+     S=C_T*P_k_k*C_T.transpose() + Q_variance; //observation
      K = P_k_k*C_T.transpose()*S.inverse();
      x_k_k = x_k_k + K*y;
      P_k_k=( eye3 -K*C_T)*P_k_k;
