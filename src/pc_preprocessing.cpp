@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021, Chuanbeibei Shi and Yushu Yu
+ * Copyright (C) 2021, Chuanbeibei Shi, Yushu Yu and Mauro Bellone
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
