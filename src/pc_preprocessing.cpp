@@ -265,7 +265,12 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 0	0	0	1
       */
 
-	 double fx, fy, cx, cy; //
+	 double fx, fy, cx, cy; //the intrinsic paramters of the camera
+	 fx = 264.0;
+	 fy = 263.700000000000;
+	 cx = 343.760000000000;
+	 cy = 183.879500000000;
+
 	 Eigen::Matrix3d fp_tra(3,3);   //see notebook
      fp_tra << (feat_point[0]-343.76)/264,   0.998801000000000,  -0.0479053000000000,
     		 (feat_point[1] -183.8795)/263.70,   0.0489563000000000,  0.979473000000000,
@@ -289,6 +294,12 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 
      cout << "feature point in LiDAR frame: " << p_f_L(0)  << ", " << p_f_L(1)  << ", "   << p_f_L(2)  << endl;
      cout << "feature point in camera frame: " << p_f_c(0)  << ", "  << p_f_c(1) << ", "  << p_f_c(2)  << endl;
+
+     //the covariance calculation:
+
+     Eigen::MatrixXd J_M(2,3);
+     J_M << 1/p_f_c(2)*fx , 0,  -fx*p_f_c(0)/(p_f_c(2)* p_f_c(2)),
+    		 0,  1/p_f_c(2)*fy,  -fy*p_f_c(1)/(p_f_c(2)* p_f_c(2));
 
 /*
      G_T = [eye(3,3), t_est*eye(3,3); zeros(3,3), eye(3,3)]; %state transition matrix
@@ -337,6 +348,12 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 			 0, 0, 0, 0, 0, 0,
 			 0, 0, 0, 0, 0, 0,
 			 0, 0, 0, 0, 0, 0;
+
+     Eigen::Matrix3d J_Mtinv;
+     J_Mtinv = J_M.transpose()*J_M;
+     J_Mtinv = J_Mtinv.inverse();
+     double sigma_var = 0.1; //the variance of the feature points in pixel frame
+     Q_variance = sigma_var*sigma_var*J_Mtinv; //see notebook
 
      Eigen::Matrix3d  S, K;
      Eigen::Quaterniond q_3(pose_global.pose.orientation.w,pose_global.pose.orientation.x ,pose_global.pose.orientation.y,pose_global.pose.orientation.z);
