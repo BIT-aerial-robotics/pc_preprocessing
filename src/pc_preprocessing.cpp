@@ -58,6 +58,8 @@ double feat_point[2] = {300,150}; //the feature position in the pixel frame, det
 vector<pointcoordinate> pc_array_feature; //put the feature points in the array
 Eigen::Vector3d x_k_k;
 Eigen::Matrix3d P_k_k = Eigen::Matrix3d::Zero();
+int flag_int_xkk = 0;
+int flag_int_xkk_last = 0;
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -292,11 +294,20 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      p_f_L << x_f_l, v_mi(1), v_mi(2);
      p_f_c << x_f_c, y_f_c, z_f_c;
 
+
+     flag_int_xkk_last = flag_int_xkk;
+     flag_int_xkk = 1;
+
      cout << "feature point in LiDAR frame: " << p_f_L(0)  << ", " << p_f_L(1)  << ", "   << p_f_L(2)  << endl;
      cout << "feature point in camera frame: " << p_f_c(0)  << ", "  << p_f_c(1) << ", "  << p_f_c(2)  << endl;
 
      //the covariance calculation:
 
+     if ((flag_int_xkk_last == 0) & (flag_int_xkk == 1)){
+    	 x_k_k = p_f_c;  //initialization of the variable in kalman filter
+     }
+
+     if (flag_int_xkk == 1){
      Eigen::MatrixXd J_M(2,3);
      J_M << 1/p_f_c(2)*fx , 0,  -fx*p_f_c(0)/(p_f_c(2)* p_f_c(2)),
     		 0,  1/p_f_c(2)*fy,  -fy*p_f_c(1)/(p_f_c(2)* p_f_c(2));
@@ -389,6 +400,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      P_k_k=( eye3 -K*C_T)*P_k_k;
 
      cout << "After Kalman filter: " << x_k_k(0)  << ", " << x_k_k(1)  << ", "   << x_k_k(2)  << endl;
+     }
 }
 
 int main(int argc, char **argv)
