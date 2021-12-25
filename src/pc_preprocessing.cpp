@@ -312,47 +312,48 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      J_M << 1/p_f_c(2)*fx , 0,  -fx*p_f_c(0)/(p_f_c(2)* p_f_c(2)),
     		 0,  1/p_f_c(2)*fy,  -fy*p_f_c(1)/(p_f_c(2)* p_f_c(2));
 
-/*
-     G_T = [eye(3,3), t_est*eye(3,3); zeros(3,3), eye(3,3)]; %state transition matrix
-     H_T = [0.5*t_est*t_est*eye(3,3); t_est*eye(3,3)];  %input matrix
-     C_T = [eye(3,3), zeros(3,3)]; %output matrix
 
-     k_input = round(k*t_est/t_input);
-     if k_input > size_T_input
-         u_k = u_array_noise(1:3, end);
-     else
-         u_k = u_array_noise(1:3, k_input);
-     end
+//     G_T = [eye(3,3), t_est*eye(3,3); zeros(3,3), eye(3,3)]; %state transition matrix
+//     H_T = [0.5*t_est*t_est*eye(3,3); t_est*eye(3,3)];  %input matrix
+//     C_T = [eye(3,3), zeros(3,3)]; %output matrix
+//
+//     k_input = round(k*t_est/t_input);
+//     if k_input > size_T_input
+//         u_k = u_array_noise(1:3, end);
+//     else
+//         u_k = u_array_noise(1:3, k_input);
+//     end
+//
+//     k_ob = round(k*t_est/t_ob_global);
+//     if k_ob > size_T_ob
+//         z_k = z_array(1:3, end);
+//     elseif k_ob ==0
+//         z_k = z_array(1:3, 1);
+//     else
+//         z_k = z_array(1:3, k_ob);
+//     end
+//
+//     x_k_k_1 = G_T*x_k_k + H_T* u_k;
+//     P_k_k_1 = G_T*P_k_k*G_T' + H_T*R*H_T';
+//
+//     y = z_k -C_T*x_k_k_1;
+//     S=C_T*P_k_k_1*C_T'+ Q; %observation
+//     K=P_k_k_1*C_T'*inv(S);
+//     x_k_k=x_k_k_1+K*y;
+//     P_k_k=(eye(6,6)-K*C_T)*P_k_k_1;
+//     x_array_est(:,k)=x_k_k;
 
-     k_ob = round(k*t_est/t_ob_global);
-     if k_ob > size_T_ob
-         z_k = z_array(1:3, end);
-     elseif k_ob ==0
-         z_k = z_array(1:3, 1);
-     else
-         z_k = z_array(1:3, k_ob);
-     end
-
-     x_k_k_1 = G_T*x_k_k + H_T* u_k;
-     P_k_k_1 = G_T*P_k_k*G_T' + H_T*R*H_T';
-
-     y = z_k -C_T*x_k_k_1;
-     S=C_T*P_k_k_1*C_T'+ Q; %observation
-     K=P_k_k_1*C_T'*inv(S);
-     x_k_k=x_k_k_1+K*y;
-     P_k_k=(eye(6,6)-K*C_T)*P_k_k_1;
-     x_array_est(:,k)=x_k_k;
-     */
      Eigen::Matrix3d  eye3, G_T, C_T;
      Eigen::Vector3d omega_s,  v_s; //angular velocity of the sensor relative to earth, and the velocity relative to earth
      double deltat = 0.0333333;  //sampling time
      eye3.setIdentity();
+     cout << "twist: " << velk.twist.angular.x << ", " << velk.twist.angular.y<< ", "   << velk.twist.angular.z << endl;
      omega_s << velk.twist.angular.x, velk.twist.angular.y, velk.twist.angular.z;
      v_s << velk.twist.linear.x, velk.twist.linear.y, velk.twist.linear.z;
 
-     Eigen::Matrix3d omega_s_hat, R_s_E;  //rotation matrix of sensor relative to earth frame.
+     Eigen::Matrix3d omega_s_hat(3,3), R_s_E;  //rotation matrix of sensor relative to earth frame.
      Eigen::Matrix3d  Q_variance;  //covariance of feature position in the sensor frame
-     Eigen::MatrixXd R_variance;  //covariance of angular velocity and linear velocity
+     Eigen::MatrixXd R_variance(6,6);  //covariance of angular velocity and linear velocity
      R_variance  <<  0, 0, 0, 0, 0, 0,
     		 0, 0, 0, 0, 0, 0,
 			 0, 0, 0, 0, 0, 0,
@@ -362,7 +363,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 
      Eigen::Matrix3d J_Mtinv;
      J_Mtinv = J_M.transpose()*J_M;
-     J_Mtinv = J_Mtinv.inverse();
+    // J_Mtinv = J_Mtinv.inverse();  //needs to be revised, current equation cannot be inverted, Dec, 25, 2021
      double sigma_var = 0.1; //the variance of the feature points in pixel frame
      Q_variance = sigma_var*sigma_var*J_Mtinv; //see notebook
 
@@ -371,21 +372,21 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      q_3.normalize();
      R_s_E = q_3.toRotationMatrix();
 
-	 omega_s_hat << 0, -omega_s(3), omega_s(2),
-    		 omega_s(3), 0, -omega_s(1),
-             -omega_s(2), omega_s(1), 0;
+	 omega_s_hat << 0, -omega_s(2), omega_s(1),
+    		 omega_s(2), 0, -omega_s(0),
+             -omega_s(1), omega_s(0), 0;
 
-	 Eigen::Matrix3d p_hat;
-	 p_hat << 0, -x_k_k(3), x_k_k(2),
-			 x_k_k(3), 0, -x_k_k(1),
-			 -x_k_k(2), x_k_k(1), 0;
+	 Eigen::Matrix3d p_hat(3,3);
+	 p_hat << 0, -x_k_k(2), x_k_k(1),
+			 x_k_k(2), 0, -x_k_k(0),
+			 -x_k_k(1), x_k_k(0), 0;
 
      G_T =  -deltat*omega_s_hat+eye3;
-     Eigen::MatrixXd   H_T;
+     Eigen::MatrixXd   H_T(3,6);
      H_T << p_hat, -eye3;
      H_T = -deltat*H_T;
      C_T = eye3;
-     Eigen::VectorXd  u_k;  //the velocity of sensor frame relative to the earth frame, in the sensor frame
+     Eigen::VectorXd  u_k(6);  //the velocity of sensor frame relative to the earth frame, in the sensor frame
      u_k << omega_s, v_s;
      x_k_k = G_T*x_k_k + H_T* u_k;
      P_k_k = G_T*P_k_k*G_T.transpose() + H_T*R_variance*H_T.transpose();
