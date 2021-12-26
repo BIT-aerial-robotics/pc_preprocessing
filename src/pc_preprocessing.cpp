@@ -366,6 +366,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
     // J_Mtinv = J_Mtinv.inverse();  //needs to be revised, current equation cannot be inverted, Dec, 25, 2021
      double sigma_var = 0.1; //the variance of the feature points in pixel frame
      Q_variance = sigma_var*sigma_var*J_Mtinv; //see notebook
+     Q_variance.Identity();
 
      Eigen::Matrix3d  S, K;
      Eigen::Quaterniond q_3(pose_global.pose.orientation.w,pose_global.pose.orientation.x ,pose_global.pose.orientation.y,pose_global.pose.orientation.z);
@@ -396,10 +397,18 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      z_k = p_f_c; //output from yolov3
      y = z_k - C_T*x_k_k;
      S=C_T*P_k_k*C_T.transpose() + Q_variance; //observation
+     S = 0.01*eye3;
      K = P_k_k*C_T.transpose()*S.inverse();
+     //K = eye3;
      x_k_k = x_k_k + K*y;
      P_k_k=( eye3 -K*C_T)*P_k_k;
 
+     cout << "z_k:" << z_k <<endl;
+     cout << " C_T:" << C_T << endl;
+     cout << " G_T:"  << G_T << endl;
+     cout << "H_T: " << H_T << endl;
+     cout << "K:" << K << endl;
+     cout << "y in Kalman filter: " << y(0)  << ", " << y(1)  << ", "   << y(2)  << endl;
      cout << "After Kalman filter: " << x_k_k(0)  << ", " << x_k_k(1)  << ", "   << x_k_k(2)  << endl;
      }
 }
