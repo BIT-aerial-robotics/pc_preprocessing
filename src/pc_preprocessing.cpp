@@ -57,7 +57,7 @@ geometry_msgs::PoseStamped  pose_global;
 double feat_point[2] = {300,150}; //the feature position in the pixel frame, detected by the detector
 vector<pointcoordinate> pc_array_feature; //put the feature points in the array
 Eigen::Vector3d x_k_k;
-Eigen::Matrix3d P_k_k = Eigen::Matrix3d::Zero();
+Eigen::Matrix3d P_k_k = Eigen::Matrix3d::Identity();
 int flag_int_xkk = 0;
 int flag_int_xkk_last = 0;
 
@@ -347,9 +347,13 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      Eigen::Vector3d omega_s,  v_s; //angular velocity of the sensor relative to earth, and the velocity relative to earth
      double deltat = 0.0333333;  //sampling time
      eye3.setIdentity();
-     cout << "twist: " << velk.twist.angular.x << ", " << velk.twist.angular.y<< ", "   << velk.twist.angular.z << endl;
      omega_s << velk.twist.angular.x, velk.twist.angular.y, velk.twist.angular.z;
      v_s << velk.twist.linear.x, velk.twist.linear.y, velk.twist.linear.z;
+
+     //omega_s = Eigen::Vector3d::Zero();
+     //v_s = Eigen::Vector3d::Zero();
+     //omega_s = Eigen::Vector3d::Random(3,1);
+     //v_s = Eigen::Vector3d::Random(3,1);
 
      Eigen::Matrix3d omega_s_hat(3,3), R_s_E;  //rotation matrix of sensor relative to earth frame.
      Eigen::Matrix3d  Q_variance;  //covariance of feature position in the sensor frame
@@ -366,7 +370,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
     // J_Mtinv = J_Mtinv.inverse();  //needs to be revised, current equation cannot be inverted, Dec, 25, 2021
      double sigma_var = 0.1; //the variance of the feature points in pixel frame
      Q_variance = sigma_var*sigma_var*J_Mtinv; //see notebook
-     Q_variance.Identity();
+     Q_variance = Eigen::Matrix3d::Random(3,3);
 
      Eigen::Matrix3d  S, K;
      Eigen::Quaterniond q_3(pose_global.pose.orientation.w,pose_global.pose.orientation.x ,pose_global.pose.orientation.y,pose_global.pose.orientation.z);
@@ -389,20 +393,24 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      C_T = eye3;
      Eigen::VectorXd  u_k(6);  //the velocity of sensor frame relative to the earth frame, in the sensor frame
      u_k << omega_s, v_s;
-     x_k_k = G_T*x_k_k + H_T* u_k;
+     //x_k_k = G_T*x_k_k + H_T* u_k;  //linear
+     x_k_k = deltat*(x_k_k.cross(omega_s) - v_s) + x_k_k;  //non-linear
      P_k_k = G_T*P_k_k*G_T.transpose() + H_T*R_variance*H_T.transpose();
 
      Eigen::Vector3d y, z_k;
 
      z_k = p_f_c; //output from yolov3
-     y = z_k - C_T*x_k_k;
+     y = z_k - C_T*x_k_k;   //nonlinear
      S=C_T*P_k_k*C_T.transpose() + Q_variance; //observation
-     S = 0.01*eye3;
+    // S = 0.01*eye3;
      K = P_k_k*C_T.transpose()*S.inverse();
-     //K = eye3;
+    // K = 0.1*eye3;
      x_k_k = x_k_k + K*y;
      P_k_k=( eye3 -K*C_T)*P_k_k;
 
+     cout << "input: " << v_s << omega_s << endl;
+     cout << "S:" << S <<endl;
+     cout << "P_k_k:" << P_k_k <<endl;
      cout << "z_k:" << z_k <<endl;
      cout << " C_T:" << C_T << endl;
      cout << " G_T:"  << G_T << endl;
