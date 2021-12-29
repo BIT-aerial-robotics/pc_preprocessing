@@ -370,7 +370,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
     // J_Mtinv = J_Mtinv.inverse();  //needs to be revised, current equation cannot be inverted, Dec, 25, 2021
      double sigma_var = 0.1; //the variance of the feature points in pixel frame
      Q_variance = sigma_var*sigma_var*J_Mtinv; //see notebook
-     Q_variance = Eigen::Matrix3d::Random(3,3);
+     Q_variance = Eigen::Matrix3d::Random(3,3);  //how to solve it?
 
      Eigen::Matrix3d  S, K;
      Eigen::Quaterniond q_3(pose_global.pose.orientation.w,pose_global.pose.orientation.x ,pose_global.pose.orientation.y,pose_global.pose.orientation.z);
