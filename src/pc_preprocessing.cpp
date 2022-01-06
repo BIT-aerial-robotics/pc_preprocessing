@@ -278,6 +278,16 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
     		 (feat_point[1] -183.8795)/263.70,   0.0489563000000000,  0.979473000000000,
                   1,   -0.000526794000000000,  0.195801000000000;
 
+
+     Eigen::Matrix3d pApu, pApv;
+     pApu << 1/264,  0,  0,
+    		 0, 0, 0,
+			 0, 0, 0;
+     pApv << 1/263.7,  0,  0,
+         		 0, 0, 0,
+     			 0, 0, 0;
+     Eigen::Matrix3d pfpuvx =  -fp_tra.inverse()*pApu*fp_tra.inverse();
+
      Eigen::Vector3d fp_vec(3);
      Eigen::Vector3d r1(3);
      r1 <<  0.0101012000000000,  -0.195541000000000,  0.980644000000000;
