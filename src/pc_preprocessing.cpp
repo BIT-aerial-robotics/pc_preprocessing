@@ -279,14 +279,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
                   1,   -0.000526794000000000,  0.195801000000000;
 
 
-     Eigen::Matrix3d pApu, pApv;
-     pApu << 1/264,  0,  0,
-    		 0, 0, 0,
-			 0, 0, 0;
-     pApv << 1/263.7,  0,  0,
-         		 0, 0, 0,
-     			 0, 0, 0;
-     Eigen::Matrix3d pfpuvx =  -fp_tra.inverse()*pApu*fp_tra.inverse();
+
 
      Eigen::Vector3d fp_vec(3);
      Eigen::Vector3d r1(3);
@@ -296,6 +289,22 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      fp_vec = x_f_l*r1 + t_c_L;
      Eigen::Vector3d v_mi;
      v_mi = fp_tra.inverse()*fp_vec;
+
+     //the jacobian matrix for covariance calculation
+     Eigen::Matrix3d pApu, pApv;
+     pApu << 1/264,  0,  0,
+         		 0, 0, 0,
+     			 0, 0, 0;
+     pApv << 0,  0,  0,
+    		 1/263.7, 0, 0,
+          			 0, 0, 0;
+     Eigen::Vector3d pfpuvx1 =  -fp_tra.inverse()*pApu*fp_tra.inverse()*fp_vec;
+     Eigen::Vector3d pfpuvx2 =  -fp_tra.inverse()*pApv*fp_tra.inverse()*fp_vec;
+     Eigen::Vector3d pfpuvx3 =  -fp_tra.inverse()*(r1 + t_c_L);
+     Eigen::Matrix3d pfpuvx;
+     pfpuvx << pfpuvx1,pfpuvx2, pfpuvx3;
+     Eigen::MatrixXd pfpuvx23row(2,3);
+     pfpuvx23row = pfpuvx.block<2,3>(1,0);
 
      double z_f_c = v_mi(0);
      double x_f_c = (feat_point[0] - 343.76)* z_f_c /264;
@@ -314,7 +323,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      //the covariance calculation:
 
      if ((flag_int_xkk_last == 0) & (flag_int_xkk == 1)){
-    	 x_k_k = p_f_c;  //initialization of the variable in kalman filter
+    	 x_k_k = p_f_L;  //initialization of the variable in kalman filter
      }
 
      if (flag_int_xkk == 1){
@@ -379,8 +388,16 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      J_Mtinv = J_M.transpose()*J_M;
     // J_Mtinv = J_Mtinv.inverse();  //needs to be revised, current equation cannot be inverted, Dec, 25, 2021
      double sigma_var = 0.1; //the variance of the feature points in pixel frame
-     Q_variance = sigma_var*sigma_var*J_Mtinv; //see notebook
-     Q_variance = Eigen::Matrix3d::Random(3,3);  //how to solve it?
+     //Q_variance = sigma_var*sigma_var*J_Mtinv; //see notebook
+     //Q_variance = Eigen::Matrix3d::Random(3,3);  //how to solve it?
+
+     Eigen::Matrix3d vari_pix_z;
+     vari_pix_z << 0.1, 0, 0,
+                   0, 0.1, 0,
+				   0, 0, 0.1;
+     Q_variance(0,0) = 0.1;  //the variance of x component.
+     Q_variance.block<2,2>(1,1) = pfpuvx23row*vari_pix_z*pfpuvx23row.adjoint();
+     cout << "Q_variance" << Q_variance << endl;
 
      Eigen::Matrix3d  S, K;
      Eigen::Quaterniond q_3(pose_global.pose.orientation.w,pose_global.pose.orientation.x ,pose_global.pose.orientation.y,pose_global.pose.orientation.z);
@@ -409,7 +426,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 
      Eigen::Vector3d y, z_k;
 
-     z_k = p_f_c; //output from yolov3
+     z_k = p_f_L; //output from yolov3
      y = z_k - C_T*x_k_k;   //nonlinear
      S=C_T*P_k_k*C_T.transpose() + Q_variance; //observation
     // S = 0.01*eye3;
