@@ -73,6 +73,7 @@ typedef struct
 bool compare_pc_v(const pointcoordinate& left,const pointcoordinate& right);
 int upsampling_pro(pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int no);
 
+extern ros::Publisher pubimg;
 
 #endif 
 

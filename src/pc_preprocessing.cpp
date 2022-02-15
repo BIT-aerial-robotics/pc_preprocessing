@@ -54,12 +54,14 @@ minmaxuv_ minmaxuv;
 cv::Mat img;
 vector<geometry_msgs::PoseStamped>  pose_series;
 geometry_msgs::PoseStamped  pose_global;
+sensor_msgs::Image img1;
 double feat_point[2] = {300,150}; //the feature position in the pixel frame, detected by the detector
 vector<pointcoordinate> pc_array_feature; //put the feature points in the array
 Eigen::Vector3d x_k_k;
 Eigen::Matrix3d P_k_k = Eigen::Matrix3d::Identity();
 int flag_int_xkk = 0;
 int flag_int_xkk_last = 0;
+ros::Publisher pubimg;
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -197,6 +199,7 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
 
     //cv::Mat img  = cv_ptr -> image;
     img  = cv_ptr -> image;
+    pubimg.publish(*msg);
 
  	// cv::imshow("image", img);
 	// cv::waitKey(1);
@@ -457,6 +460,8 @@ int main(int argc, char **argv)
   ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1000, imgCallback);
   ros::Subscriber subpos = n.subscribe("/mavros/local_position/pose", 1000, poseCallback);
   ros::Subscriber subvel = n.subscribe("/mavros/local_position/velocity_body", 1000, velCallback);
+
+  pubimg = n.advertise<sensor_msgs::Image>("/camera/rgb/image_raw",  1000);
 
   ros::spin();
 
