@@ -21,7 +21,8 @@ using namespace std;
 extern vector<pointcoordinate> pc_array_grid[921600];
 extern double feat_point[2]; //the feature position in the pixel frame, detected by the detector
 extern vector<pointcoordinate> pc_array_feature; //put the feature points in the array
-
+extern ros::Publisher pubimg_upsample;
+extern sensor_msgs::Image imgrgb;
 
 int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int nof) {
 	// Use std::chrono to time the algorithm
@@ -147,6 +148,17 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
   chrono::duration<double> time_used = chrono::duration_cast < chrono::duration < double >> (t2 - t1);
   cout << "Total time in upsampling: " << time_used.count() << " s." << endl;
+
+  //cv::Mat image_upsample2 = cv::Mat::zeros(h, w, CV_8UC(3)); //initialize the mat variable according to the size of image
+
+  cv_bridge::CvImage out_msg;
+  out_msg.header   = imgrgb.header; // Same timestamp and tf frame as input image
+  out_msg.encoding = sensor_msgs::image_encodings::BGR8; //gbr8
+  out_msg.image    = image_upsample; // Your cv::Mat
+
+  pubimg.publish(imgrgb);
+  pubimg_upsample.publish(out_msg.toImageMsg());
+  ROS_INFO("image published.");
 
   char pic0[50];
 

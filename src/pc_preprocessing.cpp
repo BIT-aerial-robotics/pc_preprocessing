@@ -62,6 +62,8 @@ Eigen::Matrix3d P_k_k = Eigen::Matrix3d::Identity();
 int flag_int_xkk = 0;
 int flag_int_xkk_last = 0;
 ros::Publisher pubimg;
+ros::Publisher pubimg_upsample;
+sensor_msgs::Image imgrgb;
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -195,23 +197,28 @@ void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
 {
 	cv_bridge::CvImagePtr cv_ptr;
-    cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
-    //cv::Mat img  = cv_ptr -> image;
-    img  = cv_ptr -> image;
-    pubimg.publish(*msg);
+	//cout << "encoding: " << msg->encoding << endl; //bgr8a
+	//if(msg->encoding == "mono8" || msg->encoding == "bgr8" || msg->encoding == "rgb8"){
+      //cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+      cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+      //cv::Mat img  = cv_ptr -> image;
+      img  = cv_ptr -> image;
 
- 	// cv::imshow("image", img);
-	// cv::waitKey(1);
+      imgrgb = *msg;
+
+     // cv::imshow("image", img);
+	 // cv::waitKey(1);
 //    char img1[50];
 //    sprintf(img1, "/tmp/%02dimg.png",i_img_count);
 //    cv::imwrite(img1, img); //save the image
 //    i_img_count ++;
 
-	w_img = img.cols;
-	h_img = img.rows;
-	c_img = img.channels();
-    ROS_INFO("image width: %d, height: %d, channels: %d.", w_img, h_img, c_img);
+	  w_img = img.cols;
+	  h_img = img.rows;
+	  c_img = img.channels();
+      //ROS_INFO("image width: %d, height: %d, channels: %d.", w_img, h_img, c_img);
+	//}
 }
 
 void poseCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg)
@@ -462,6 +469,7 @@ int main(int argc, char **argv)
   ros::Subscriber subvel = n.subscribe("/mavros/local_position/velocity_body", 1000, velCallback);
 
   pubimg = n.advertise<sensor_msgs::Image>("/camera/rgb/image_raw",  1000);
+  pubimg_upsample = n.advertise<sensor_msgs::Image>("/camera/xyz/image_upsampling",  1000);
 
   ros::spin();
 
