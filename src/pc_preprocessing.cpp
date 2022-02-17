@@ -33,7 +33,7 @@ using namespace std;
 int w_img = 672, h_img = 376, c_img =3; //1105 dataset
 int i_pc_count = 0;
 int i_img_count = 0;
-int sum_pc = 2;
+int sum_pc = 3;
 int sum_pc_i = 0;
 long int pc_size = 0;
 pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -458,6 +458,13 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      }
 }
 
+void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
+	 darknet_ros_msgs::BoundingBoxes boundingBoxesResults_ = *msg;
+	 int boxno = msg->bounding_boxes.size();
+
+	 cout << "box no: " << boxno << endl;
+}
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "pc_preprocessing");
@@ -467,6 +474,8 @@ int main(int argc, char **argv)
   ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1000, imgCallback);
   ros::Subscriber subpos = n.subscribe("/mavros/local_position/pose", 1000, poseCallback);
   ros::Subscriber subvel = n.subscribe("/mavros/local_position/velocity_body", 1000, velCallback);
+
+  ros::Subscriber subdetection = n.subscribe("/darknet_ros/bounding_boxes", 1000, detectCallback);  //dependency: darknet_ros_msgs
 
   pubimg = n.advertise<sensor_msgs::Image>("/camera/rgb/image_raw",  1000);
   pubimg_upsample = n.advertise<sensor_msgs::Image>("/camera/xyz/image_upsampling",  1000);

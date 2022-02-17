@@ -162,7 +162,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
 
   char pic0[50];
 
-  sprintf(pic0, "/tmp/%02dimage_upsample.png", nof);
+  sprintf(pic0, "/tmp/%02dimg_2.png", nof);
   //cv::cvtColor(image_upsample, image_upsample_grey, cv::COLOR_BGR2GRAY);
   //cv::imshow("image_upsample", image_upsample_grey);
   //cv::imshow("image_upsample", image_upsample);
@@ -178,11 +178,11 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   sprintf(pic2, "/tmp/%02dupsamplesave_1.png",nof);
   sprintf(pic3, "/tmp/%02dupsamplesave_2.png",nof);
   // cv::imshow("x of image_upsample", channel[0]);
-  cv::imwrite(pic1, channel[0]); //save the image
+ // cv::imwrite(pic1, channel[0]); //save the image
   // cv::imshow("y of image_upsample", channel[1]);
-  cv::imwrite(pic2, channel[1]); //save the image
+ // cv::imwrite(pic2, channel[1]); //save the image
   // cv::imshow("z of image_upsample", channel[2]);
-  cv::imwrite(pic3, channel[2]); //save the image
+ // cv::imwrite(pic3, channel[2]); //save the image
 
   // cv::waitKey(1);
   cv::destroyAllWindows();

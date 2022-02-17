@@ -45,6 +45,12 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+// darknet_ros_msgs
+#include <darknet_ros_msgs/BoundingBox.h>
+#include <darknet_ros_msgs/BoundingBoxes.h>
+#include <darknet_ros_msgs/CheckForObjectsAction.h>
+#include <darknet_ros_msgs/ObjectCount.h>
+
 class pointcoordinate
 {
 public:
