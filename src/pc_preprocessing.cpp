@@ -463,6 +463,36 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
 	 int boxno = msg->bounding_boxes.size();
 
 	 cout << "box no: " << boxno << endl;
+
+	 //feat_point[0] = (boundingBoxesResults_.bounding_boxes[0].xmin + boundingBoxesResults_.bounding_boxes[0].xmax)/2;
+	 //feat_point[1] = (boundingBoxesResults_.bounding_boxes[0].ymin + boundingBoxesResults_.bounding_boxes[0].ymax)/2;
+
+
+//	    for (int i = 0; i < boxno; i++) {
+//
+//	        darknet_ros_msgs::BoundingBox boundingBox;
+//
+//	        for (int j = 0; j < rosBoxCounter_[i]; j++) {
+//	          int xmin = (rosBoxes_[i][j].x - rosBoxes_[i][j].w / 2) * frameWidth_;
+//	          int ymin = (rosBoxes_[i][j].y - rosBoxes_[i][j].h / 2) * frameHeight_;
+//	          int xmax = (rosBoxes_[i][j].x + rosBoxes_[i][j].w / 2) * frameWidth_;
+//	          int ymax = (rosBoxes_[i][j].y + rosBoxes_[i][j].h / 2) * frameHeight_;
+//
+//	          boundingBox.Class = classLabels_[i];
+//	          boundingBox.id = i;
+//	          boundingBox.probability = rosBoxes_[i][j].prob;
+//	          boundingBox.xmin = xmin;
+//	          boundingBox.ymin = ymin;
+//	          boundingBox.xmax = xmax;
+//	          boundingBox.ymax = ymax;
+//	          boundingBox.utx = rosBoxes_[i][j].utx;
+//	          boundingBox.uty = rosBoxes_[i][j].uty;
+//	          boundingBox.utw = rosBoxes_[i][j].utw;
+//	          boundingBox.uth = rosBoxes_[i][j].uth;
+//	          boundingBoxesResults_.bounding_boxes.push_back(boundingBox);
+//	        }
+//
+//	    }
 }
 
 int main(int argc, char **argv)
@@ -479,6 +509,7 @@ int main(int argc, char **argv)
 
   pubimg = n.advertise<sensor_msgs::Image>("/camera/rgb/image_raw",  1000);
   pubimg_upsample = n.advertise<sensor_msgs::Image>("/camera/xyz/image_upsampling",  1000);
+
 
   ros::spin();
 
