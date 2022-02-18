@@ -33,7 +33,7 @@ using namespace std;
 int w_img = 672, h_img = 376, c_img =3; //1105 dataset
 int i_pc_count = 0;
 int i_img_count = 0;
-int sum_pc = 3;
+int sum_pc = 4;
 int sum_pc_i = 0;
 long int pc_size = 0;
 pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -64,6 +64,8 @@ int flag_int_xkk_last = 0;
 ros::Publisher pubimg;
 ros::Publisher pubimg_upsample;
 sensor_msgs::Image imgrgb;
+float sigma_feature[2]={0,0}; //the uncertainty of feature in pixel frame
+int ifdetection = 0 ;
 
 void pc2Callback(const  sensor_msgs::PointCloud2::ConstPtr& msg)
 {
@@ -249,6 +251,12 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 	    		  sum_no++;
 	    	  }*/
 
+     if (pc_array_feature.size() == 0){
+    	 cerr << "No point near the feature region." << endl;
+    	 sum_no = 1;
+     }
+     else{
+
      for (int i_pc =  0; i_pc < pc_array_feature.size(); i_pc++){
      	    		  sum_x = pc_array_feature[i_pc].x_3d + sum_x;
      	    		  sum_no++;
@@ -277,7 +285,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 0	0	0	1
       */
 
-	 double fx, fy, cx, cy; //the intrinsic paramters of the camera
+	 double fx, fy, cx, cy; //the intrinsic parameters of the camera
 	 fx = 264.0;
 	 fy = 263.700000000000;
 	 cx = 343.760000000000;
@@ -302,11 +310,11 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 
      //the jacobian matrix for covariance calculation
      Eigen::Matrix3d pApu, pApv;
-     pApu << 1/264,  0,  0,
+     pApu << 1/fx,  0,  0,
          		 0, 0, 0,
      			 0, 0, 0;
      pApv << 0,  0,  0,
-    		 1/263.7, 0, 0,
+    		 1/fy, 0, 0,
           			 0, 0, 0;
      Eigen::Vector3d pfpuvx1 =  -fp_tra.inverse()*pApu*fp_tra.inverse()*fp_vec;
      Eigen::Vector3d pfpuvx2 =  -fp_tra.inverse()*pApv*fp_tra.inverse()*fp_vec;
@@ -394,6 +402,13 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 			 0, 0, 0, 0, 0, 0,
 			 0, 0, 0, 0, 0, 0;
 
+     R_variance  <<  0.1, 0, 0, 0, 0, 0,
+         		 0, 0.1, 0, 0, 0, 0,
+     			 0, 0, 0.1, 0, 0, 0,
+     			 0, 0, 0, 0.1, 0, 0,
+     			 0, 0, 0, 0, 0.1, 0,
+     			 0, 0, 0, 0, 0, 0.1;
+
      Eigen::Matrix3d J_Mtinv;
      J_Mtinv = J_M.transpose()*J_M;
     // J_Mtinv = J_Mtinv.inverse();  //needs to be revised, current equation cannot be inverted, Dec, 25, 2021
@@ -402,9 +417,15 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      //Q_variance = Eigen::Matrix3d::Random(3,3);  //how to solve it?
 
      Eigen::Matrix3d vari_pix_z;
-     vari_pix_z << 0.1, 0, 0,
-                   0, 0.1, 0,
-				   0, 0, 0.1;
+     if (ifdetection == 1)
+         vari_pix_z << 0.1, 0, 0,
+                   0, sigma_feature[0], 0,
+				   0, 0, sigma_feature[1];  //from the yoloros, the uncertainty
+     else
+    	 vari_pix_z << 0.1, 0, 0,
+    	                    0, 0.18, 0,
+    	 				   0, 0, 0.18;  //from the yoloros, the uncertainty
+
      Q_variance(0,0) = 0.1;  //the variance of x component.
      Q_variance.block<2,2>(1,1) = pfpuvx23row*vari_pix_z*pfpuvx23row.adjoint();
      cout << "Q_variance" << Q_variance << endl;
@@ -445,16 +466,17 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
      x_k_k = x_k_k + K*y;
      P_k_k=( eye3 -K*C_T)*P_k_k;
 
-     cout << "input: " << v_s << omega_s << endl;
-     cout << "S:" << S <<endl;
-     cout << "P_k_k:" << P_k_k <<endl;
+//     cout << "input: " << v_s << omega_s << endl;
+//     cout << "S:" << S <<endl;
+//     cout << "P_k_k:" << P_k_k <<endl;
      cout << "z_k:" << z_k <<endl;
-     cout << " C_T:" << C_T << endl;
-     cout << " G_T:"  << G_T << endl;
-     cout << "H_T: " << H_T << endl;
-     cout << "K:" << K << endl;
+//     cout << " C_T:" << C_T << endl;
+//     cout << " G_T:"  << G_T << endl;
+//     cout << "H_T: " << H_T << endl;
+//     cout << "K:" << K << endl;
      cout << "y in Kalman filter: " << y(0)  << ", " << y(1)  << ", "   << y(2)  << endl;
      cout << "After Kalman filter: " << x_k_k(0)  << ", " << x_k_k(1)  << ", "   << x_k_k(2)  << endl;
+     }
      }
 }
 
@@ -466,7 +488,9 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
 
 	 //feat_point[0] = (boundingBoxesResults_.bounding_boxes[0].xmin + boundingBoxesResults_.bounding_boxes[0].xmax)/2;
 	 //feat_point[1] = (boundingBoxesResults_.bounding_boxes[0].ymin + boundingBoxesResults_.bounding_boxes[0].ymax)/2;
-
+	 sigma_feature[0] = boundingBoxesResults_.bounding_boxes[0].utx;
+	 sigma_feature[1] = boundingBoxesResults_.bounding_boxes[0].uty;
+     ifdetection = 1;
 
 //	    for (int i = 0; i < boxno; i++) {
 //
