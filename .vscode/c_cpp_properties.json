@@ -1,0 +1,46 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/mao/AirSim/ros/devel/include/**",
+        "/home/mao/yolo/devel/include/**",
+        "/home/mao/reinforce/devel/include/**",
+        "/home/mao/zed-ros/devel/include/**",
+        "/opt/ros/melodic/include/**",
+        "/home/mao/AirSim/ros/src/airsim_ros_pkgs/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_control-master/control/autopilot/include/**",
+        "/home/mao/catkin_ws/src/vins-kinematic-fusion/camera_model/include/**",
+        "/home/mao/yolo/src/darknet_ros_fusion/darknet_ros/include/**",
+        "/home/mao/reinforce/src/get_master-main/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_control-master/utils/manual_flight_assistant/include/**",
+        "/home/mao/reinforce/src/mav_comm-master/mav_msgs/include/**",
+        "/home/mao/reinforce/src/mav_comm-master/mav_planning_msgs/include/**",
+        "/home/mao/yolo/src/pre_processing/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_control-master/trajectory_planning/polynomial_trajectories/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_control-master/control/position_controller/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_common/quadrotor_common/include/**",
+        "/home/mao/reinforce/src/rpg_mpc-controller-main/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_control-master/test/rpg_quadrotor_integration_test/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_control-master/simulation/rpg_rotors_interface/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_control-master/bridges/sbus_bridge/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_common/state_predictor/include/**",
+        "/home/mao/reinforce/src/rpg_quadrotor_control-master/trajectory_planning/trajectory_generation_helper/include/**",
+        "/home/mao/reinforce/src/transmitacr-main/include/**",
+        "/home/mao/zed-ros/src/usb_cam/include/**",
+        "/home/mao/reinforce/src/velocity_control/include/**",
+        "/home/mao/zed-ros/src/zed-ros-wrapper/zed-ros-interfaces/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
