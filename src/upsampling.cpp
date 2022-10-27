@@ -509,8 +509,11 @@ using namespace std;
 // }
 
 
+
+
+int x_depth_png = 0;
 int search_box_yolo = 5;
-//借鉴ransac思路求解平均深度
+double threshold_depth = 1.5;
 /**
  * @brief calculate uav's 3D position in camera frame
  * 
@@ -521,6 +524,90 @@ int search_box_yolo = 5;
  * @param grid_z search radius
  * @return Vector3d: uav's 3D position in camera frame
  */
+
+void calculate_yolo_depth_init(vector<Vector3d> &array_pc, vector<Vector2d> &uv, vector<Vector4d> &x_depth, double u0, double v0, int grid_z, double perception, double depth_threshold_down, double depth_threshold_up){
+  // int grid_z = 5; 
+  
+  int grid_ave = 1;
+  if(grid_z !=5){
+    search_box_yolo = grid_z;
+  }
+  vector<Vector3d> pc_array_yolo;
+
+  //depth picture
+  int lenth_of_vector = (depth_threshold_up-depth_threshold_down)/perception + 5;
+  // ROS_INFO_STREAM("lenth_of_vector = "<<lenth_of_vector);
+  x_depth.clear();
+  // vector<int> x_label;
+ 
+  for(int i = 0;i<lenth_of_vector;i++){
+      x_depth.emplace_back(Vector4d::Zero());
+      // x_label.emplace_back(i);
+  }
+  
+  
+
+  int array_size = array_pc.size();
+  //ROS_INFO_STREAM("u,v = "<<u0<<", "<<v0);
+  int len_in = grid_z+grid_ave;
+  int len_in2 = len_in*len_in;
+  
+
+
+  for(int i = 0; i < array_size; i++){
+    int eu = uv[i].x() - u0;
+    int ev = uv[i].y() - v0;
+    int d2 = eu*eu + ev*ev;
+    //ROS_INFO_STREAM("d2="<<d2);
+    if(d2<=len_in2){
+      //pc_array_feature.push_back(pc_masks[i].point);
+      Vector3d in_box =Vector3d(array_pc[i].x(), array_pc[i].y(), array_pc[i].z()); 
+      pc_array_yolo.push_back(in_box);
+      if(array_pc[i].x()<depth_threshold_up && array_pc[i].x()>depth_threshold_down)//lidar frame
+      {
+        int index = int((array_pc[i].x() - depth_threshold_down)/perception)+1;
+        x_depth[index].x() += in_box.x();
+        x_depth[index].y() += in_box.y();
+        x_depth[index].z() += in_box.z();
+        x_depth[index].w() ++ ;
+      }
+        
+
+    }
+  }
+  
+  //visualization
+  for(int i=0;i<x_depth.size();i++){
+    if(x_depth[i].w()<10) {
+      x_depth[i].w() = 0;
+      x_depth[i].x() = 0;
+      x_depth[i].y() = 0;
+      x_depth[i].z() = 0;
+      // cout <<" "<<" ";
+    }else{
+      // cout <<x_depth[i]<<" ";
+    }
+  }
+  // cout<<endl;
+  return;
+}
+
+
+
+
+
+
+/**
+ * @brief calculate uav's 3D position in camera frame
+ * 
+ * @param array_pc all pc in camera frame
+ * @param uv 2d pixle coordinates vector
+ * @param u0 pixle coordinates of feature
+ * @param v0
+ * @param grid_z search radius
+ * @return Vector3d: uav's 3D position in camera frame
+ */
+
 Vector3d calculate_yolo_depth(vector<Vector3d> &array_pc, vector<Vector2d> &uv, double u0, double v0, int grid_z = 5){
   // int grid_z = 5; 
   int grid_ave = 1;
@@ -528,6 +615,15 @@ Vector3d calculate_yolo_depth(vector<Vector3d> &array_pc, vector<Vector2d> &uv, 
     search_box_yolo = grid_z;
   }
   vector<Vector3d> pc_array_yolo;
+
+  //depth picture
+  vector<int> x_depth;
+  vector<int> x_label;
+  for(int i = 0;i<100;i++){
+    x_depth.emplace_back(0);
+    x_label.emplace_back(i);
+  }
+
   int array_size = array_pc.size();
   //ROS_INFO_STREAM("u,v = "<<u0<<", "<<v0);
   int len_in = grid_z+grid_ave;
@@ -541,13 +637,37 @@ Vector3d calculate_yolo_depth(vector<Vector3d> &array_pc, vector<Vector2d> &uv, 
     if(d2<=len_in2){
       //pc_array_feature.push_back(pc_masks[i].point);
       Vector3d in_box =Vector3d(array_pc[i].x(), array_pc[i].y(), array_pc[i].z()); 
+      //depend on uav's last estimated position
+     
       pc_array_yolo.push_back(in_box);
+      //没有点云ekf
+      //pc_array_yolo.push_back(in_box);
+
+      //depth picture
+      // if(array_pc[i].z()<50)
+      // x_depth[int(array_pc[i].z())-1] = x_depth[int(array_pc[i].z())-1] + 1 ;
+      
     }
   }
-  double ave_x_last = 0;
-  double ave_y_last = 0;
-  double ave_z_last = 0;
-  //ROS_INFO_STREAM("size of box = "<<pc_array_yolo.size());
+  //plot the depth picture
+  // char depth_png[100];
+  // sprintf(depth_png, "/home/mao/Pictures/depth/%d.png", x_depth_png);
+  // plt::plot(x_label, x_depth);
+  // plt::title("x_depth");
+  // // plt::show();
+  // plt::save(depth_png);
+  // plt::close();
+  // // x_depth.clear();
+  // x_depth_png++;
+
+
+  m_ekf.lock();
+  double ave_x_last = x_k_k.x();
+  ROS_INFO_STREAM("x_K_k = "<<x_k_k.x());
+  double ave_y_last = x_k_k.y();
+  double ave_z_last = x_k_k.z();
+  m_ekf.unlock();
+  ROS_INFO_STREAM("size of box = "<<pc_array_yolo.size());
   int size_in_box = pc_array_yolo.size();
   Vector3d pc_i;
   for(int j=4;j>0;j--){
@@ -558,8 +678,10 @@ Vector3d calculate_yolo_depth(vector<Vector3d> &array_pc, vector<Vector2d> &uv, 
     //#pragma omp parallel for reduction(+: ave_x, ave_y, ave_z)
     for(int i = 0;i<size_in_box;i++){
       pc_i = pc_array_yolo[i];
-      if((abs(pc_i.x()-ave_x_last)>bottle*j || abs(pc_i.y()-ave_y_last)>bottle*j || abs(pc_i.z()-ave_z_last)>bottle*j)&& j!=4){
-        continue;
+      if(ave_x_last != 0 && ave_y_last != 0 && ave_z_last != 0){
+        if((abs(pc_i.x()-ave_x_last)>bottle*j/2.0 || abs(pc_i.y()-ave_y_last)>bottle*j/2.0 || abs(pc_i.z()-ave_z_last)>bottle*j/2.0)){
+          continue;
+        }
       }
       val_n ++;
       ave_x += pc_i.x();
@@ -571,14 +693,28 @@ Vector3d calculate_yolo_depth(vector<Vector3d> &array_pc, vector<Vector2d> &uv, 
     ave_x_last = ave_x/val_n;
     ave_y_last = ave_y/val_n;
     ave_z_last = ave_z/val_n;
-    //ROS_INFO_STREAM("val_n = "<<val_n);
+    // ROS_INFO_STREAM("val_n = "<<val_n);
     // ROS_INFO_STREAM("ave:("<<ave_x_last<<", "<<ave_y_last<<", "<<ave_z_last<<")");
   }
+  
   Vector3d out = Vector3d(ave_x_last,ave_y_last,ave_z_last);
+
   return out;
 }
 
 
+void PC_EKF_uodate(Vector3d measurements){
+  double sigma2 = 0.1;
+  Matrix3d V_pc = sigma2 * Matrix3d::Identity();//noise covariance of measurents;
+  Matrix3d H = Matrix3d::Identity();
+  m_ekf.lock();
+  Matrix3d K = P_k_k*H.transpose()*(H*P_k_k*H.transpose() + V_pc).inverse();
+  x_k_k = x_k_k + K*(measurements - x_k_k);
+  P_k_k = (eye3-K*H)*P_k_k*(eye3-K*H).transpose() + K*V_pc*K.transpose();
+  ROS_INFO_STREAM("xyz_depth_estimate = "<<x_k_k.x()<<", "<<x_k_k.y()<<", "<<x_k_k.z());
+  m_ekf.unlock();
+  return;
+}
 
 
 
@@ -627,17 +763,20 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   
 
   /*collect points in the target box for depth estimating in ekf part*/
-  TicToc center_t;
-  // m_feature.lock();
-  // double u0 = feat_point[0];
-  // double v0 = feat_point[1];
-  // m_feature.unlock();
-  // Vector3d Yolo_p = calculate_yolo_depth(yolo_depth.back().pc_cam_3d, yolo_depth.back().pc_uv, u0, v0);
-  // Vector3d normalized_box = K_in*Yolo_p;
-  // box_center_in_image = Vector2d(normalized_box.x()/normalized_box.z(), normalized_box.y()/normalized_box.z());
-
-  // ROS_INFO_STREAM("yolo_depth = "<<Yolo_p.x()<<", "<<Yolo_p.y()<<", "<<Yolo_p.z());
-  ROS_DEBUG_STREAM("process array : "<<center_t.toc()<<"ms");
+  
+  // if(flag_int_xkk_last == 1){
+  //   TicToc center_t;
+  //   // search center is read from feat_point
+  //   Vector3d Yolo_p;
+  //   ROS_INFO_STREAM("(u, v) = ("<<u0<<", "<<v0 );
+  //   Yolo_p = calculate_yolo_depth(yolo_depth.back().pc_lidar_3d, yolo_depth.back().pc_uv, u0, v0, 30);
+    
+  //   //pc ekf update
+  //   PC_EKF_uodate(Yolo_p);
+    
+  //   ROS_DEBUG_STREAM("process array : "<<center_t.toc()<<"ms");
+  // } 
+  
 
   
 
@@ -873,9 +1012,9 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       //  data_ptr[0] = (unsigned char)(255.0*(ima3d_[index + 2]/ima3d[index + 2])/maxima3d[2]);
       /*get the final nomalized depth map */
       //2 1 0
-        data_ptr[0] = (unsigned char)(255.0*( (pc_manager.mask4.ima3d_[index])/(pc_manager.mask4.ima3d[index]))/ maxima3d[0]);
-        data_ptr[1] = (unsigned char)(255.0*( (pc_manager.mask4.ima3d_[index+1])/(pc_manager.mask4.ima3d[index+1]))/maxima3d[1]);
-        data_ptr[2] = (unsigned char)(255.0*( (pc_manager.mask4.ima3d_[index+2])/(pc_manager.mask4.ima3d[index+2]))/maxima3d[2]);
+        data_ptr[2] = (unsigned char)(255.0*( (pc_manager.mask4.ima3d_[index])/(pc_manager.mask4.ima3d[index]))/ maxima3d[0]);
+        data_ptr[0] = (unsigned char)(255.0*( (pc_manager.mask4.ima3d_[index+1])/(pc_manager.mask4.ima3d[index+1]))/maxima3d[1]);
+        data_ptr[1] = (unsigned char)(255.0*( (pc_manager.mask4.ima3d_[index+2])/(pc_manager.mask4.ima3d[index+2]))/maxima3d[2]);
  
     }
     
@@ -899,16 +1038,28 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     // }
     // cv::merge(img_normalized_split, img_normalized);
     pubimg.publish(imgrgb_cur);
-    //ROS_DEBUG("rgb_timestamp: %.6fms",imgrgb.header.stamp.toNSec()*(1e-6));
     pubimg_upsample.publish(out_msg.toImageMsg());
+    // pubimg.publish(out_msg.toImageMsg());
+    // pubimg_upsample.publish(imgrgb_cur);
+
+
+
+
+
+
     //ROS_DEBUG("image published.");
     ROS_DEBUG_STREAM("processing and pub 0.4s data: "<<all_time.toc()<<"ms");
-    //search_box_yolo
+    // search_box_yolo
     // if(ifdetection==1){
-      cv::circle(image_upsample, circle_center, bottle+5, cv::Scalar(0, 255, 0));
-      cv::circle(img_cur, circle_center, bottle+5, cv::Scalar(0, 255, 0));
-      cv::circle(image_upsample, rect_circle_center, bottle+5, cv::Scalar(0, 0, 255));
-      cv::circle(img_cur, rect_circle_center, bottle+5, cv::Scalar(0, 0, 255));
+      cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+      cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+      cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      // ROS_INFO_STREAM("box_grid_points.size() = "<<box_grid_points.size());
+      // for(int i = 0;i < box_grid_points.size();i++){
+      //   cv::circle(img_cur, box_grid_points[i], 1, cv::Scalar(0, 255, 0));
+      // }
+      box_grid_points.clear();
       // ifdetection = 0;
     // }
     
@@ -925,11 +1076,9 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     // sprintf(pic2, "/tmp/%02dupsamplesave_1.png",nof);
     // sprintf(pic3, "/tmp/%02dupsamplesave_2.png",nof);
     
-    //cv::imshow("x of image_upsample", channel[0]);
-    //cv::imwrite(pic1, channel[0]); //save the image
-    //cv::imshow("y of image_upsample", channel[1]);
-    //cv::imwrite(pic2, channel[1]); //save the image
-    //cv::imshow("z of image_upsample", channel[2]);
+    // cv::imshow("x of image_upsample", channel[0]);
+    // cv::imshow("y of image_upsample", channel[1]);
+    // cv::imshow("z of image_upsample", channel[2]);
     if(compare_rect){
       cv::imshow("image_upsample_no_rect", image_upsample_no_rect);
       

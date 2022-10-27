@@ -26,6 +26,8 @@ if(OPENMP_FOUND)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
+#绘图
+find_package(PythonLibs 2.7)
 
 
 catkin_package(
@@ -44,8 +46,9 @@ catkin_package(
 include_directories(
   include/pc_preprocessing
   ${catkin_INCLUDE_DIRS}
-${PCL_INCLUDE_DIRS} 
-${OpenCV_LIBS}
+  ${PCL_INCLUDE_DIRS} 
+  ${OpenCV_LIBS}
+  matplotlib-cpp
 )
 
 add_library(${PROJECT_NAME}_lib
@@ -56,12 +59,12 @@ add_library(${PROJECT_NAME}_lib
 
 
 add_executable(pc_prep src/pc_preprocessing.cpp)
-target_link_libraries(pc_prep ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PROJECT_NAME}_lib)
+target_link_libraries(pc_prep ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PROJECT_NAME}_lib ${PYTHON_INCLUDE_DIRS})
 
 
 
 add_executable(extract_image src/extract_image.cpp include/pc_preprocessing/imageBasics.h)
-target_link_libraries(extract_image ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PROJECT_NAME}_lib)
+target_link_libraries(extract_image ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PROJECT_NAME}_lib ${PYTHON_INCLUDE_DIRS})
 
 
  
