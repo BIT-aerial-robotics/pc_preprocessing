@@ -527,69 +527,212 @@ double threshold_depth = 1.5;
 
 void calculate_yolo_depth_init(vector<Vector3d> &array_pc, vector<Vector2d> &uv, vector<Vector4d> &x_depth, double u0, double v0, int grid_z, double perception, double depth_threshold_down, double depth_threshold_up){
   // int grid_z = 5; 
-  
-  int grid_ave = 1;
-  if(grid_z !=5){
-    search_box_yolo = grid_z;
-  }
-  vector<Vector3d> pc_array_yolo;
+  try{
+    int grid_ave = 1;
+    if(grid_z !=5){
+      search_box_yolo = grid_z;
+    }
+    // vector<Vector3d> pc_array_yolo;
+    x_depth.clear();
+    //depth picture
+    int lenth_of_vector = (depth_threshold_up-depth_threshold_down)/perception + 5;
+    x_depth.reserve(lenth_of_vector+1);
+    // ROS_INFO_STREAM("lenth_of_vector = "<<lenth_of_vector);
+    
+    // ROS_INFO_STREAM("x_depth capacity = "<<x_depth.capacity());
+    // vector<int> x_label;
+    if(x_depth.capacity() == 0){
+      ROS_ERROR("unknow error, vector capacity become zero!!!!!!!!");
+      return;
+    }
+    for(int i = 0;i<lenth_of_vector;i++){
+        x_depth.emplace_back(0,0,0,0);
+        // x_label.emplace_back(i);
+    }
+    
+    
 
-  //depth picture
-  int lenth_of_vector = (depth_threshold_up-depth_threshold_down)/perception + 5;
-  // ROS_INFO_STREAM("lenth_of_vector = "<<lenth_of_vector);
-  x_depth.clear();
-  // vector<int> x_label;
- 
-  for(int i = 0;i<lenth_of_vector;i++){
-      x_depth.emplace_back(Vector4d::Zero());
-      // x_label.emplace_back(i);
-  }
-  
-  
-
-  int array_size = array_pc.size();
-  //ROS_INFO_STREAM("u,v = "<<u0<<", "<<v0);
-  int len_in = grid_z+grid_ave;
-  int len_in2 = len_in*len_in;
-  
+    int array_size = array_pc.size();
+    //ROS_INFO_STREAM("u,v = "<<u0<<", "<<v0);
+    int len_in = grid_z+grid_ave;
+    int len_in2 = len_in*len_in;
+    
 
 
-  for(int i = 0; i < array_size; i++){
-    int eu = uv[i].x() - u0;
-    int ev = uv[i].y() - v0;
-    int d2 = eu*eu + ev*ev;
-    //ROS_INFO_STREAM("d2="<<d2);
-    if(d2<=len_in2){
-      //pc_array_feature.push_back(pc_masks[i].point);
-      Vector3d in_box =Vector3d(array_pc[i].x(), array_pc[i].y(), array_pc[i].z()); 
-      pc_array_yolo.push_back(in_box);
-      if(array_pc[i].x()<depth_threshold_up && array_pc[i].x()>depth_threshold_down)//lidar frame
-      {
-        int index = int((array_pc[i].x() - depth_threshold_down)/perception)+1;
-        x_depth[index].x() += in_box.x();
-        x_depth[index].y() += in_box.y();
-        x_depth[index].z() += in_box.z();
-        x_depth[index].w() ++ ;
+    for(int i = 0; i < array_size; i++){
+      int eu = uv[i].x() - u0;
+      int ev = uv[i].y() - v0;
+      int d2 = eu*eu + ev*ev;
+      //ROS_INFO_STREAM("d2="<<d2);
+      if(d2<=len_in2){
+        //pc_array_feature.push_back(pc_masks[i].point);
+        Vector3d in_box =Vector3d(array_pc[i].x(), array_pc[i].y(), array_pc[i].z()); 
+        // pc_array_yolo.emplace_back(in_box);
+        if(array_pc[i].x()<depth_threshold_up && array_pc[i].x()>depth_threshold_down)//lidar frame
+        {
+          int index = int((array_pc[i].x() - depth_threshold_down)/perception)+1;
+          if(index < x_depth.size()){
+            x_depth[index].x() += in_box.x();
+            x_depth[index].y() += in_box.y();
+            x_depth[index].z() += in_box.z();
+            x_depth[index].w() ++ ;
+          }else{
+              ROS_ERROR("index error! there is a bug in calculate_yolo_depth_init().");
+              return;
+
+          }
+        }
+          
+
       }
-        
+    }
+    
+    //visualization
+    for(int i=0;i<lenth_of_vector;i++){
+      if(x_depth[i].w()<10) {
+        x_depth[i].w() = 0;
+        x_depth[i].x() = 0;
+        x_depth[i].y() = 0;
+        x_depth[i].z() = 0;
+        // cout <<" "<<" ";
+      }else{
+        // cout <<x_depth[i].w()<<" ";
+      }
+    }
+    // cout<<endl;
+    return;
+  }
+  catch(std::bad_alloc){
+    ROS_ERROR("terminate called after throwing an instance of 'std::bad_alloc'     in calculate_yolo_depth_init.");
+    return;
+  }
+}
 
+/**
+ * @brief calculate uav's 3D position in camera frame
+ * 
+ * @param array_pc all pc in camera frame
+ * @param uv 2d pixle coordinates vector
+ * @param u0 pixle coordinates of feature
+ * @param v0
+ * @param grid_z search radius
+ * @return Vector3d: uav's 3D position in camera frame
+ */
+
+/// @brief 
+/// @param array_pc 
+/// @param uv 
+/// @param grid_depth 
+/// @param yolo_u_min 
+/// @param yolo_u_max 
+/// @param yolo_v_min 
+/// @param yolo_v_max 
+/// @param grid_z 
+/// @param perception 
+/// @param depth_threshold_down 
+/// @param depth_threshold_up 
+void calculate_yolo_depth_2(vector<Vector3d> &array_pc, vector<Vector2d> &uv, vector<vector<Vector4d>> &grid_depth, double yolo_u_min, double yolo_u_max, double yolo_v_min, double yolo_v_max, 
+                                        int grid_z, double perception, double depth_threshold_down, double depth_threshold_up){
+  try{
+    double uij,vij;
+    //set zero
+    int lenth_of_vector = (depth_threshold_up-depth_threshold_down)/perception+2;
+    vector<Vector4d> x_depth;      
+    x_depth.reserve(lenth_of_vector+1);
+    if(x_depth.capacity() == 0){
+      ROS_ERROR("unknow error, vector capacity become zero!!!!!!!!");
+      return;
     }
-  }
-  
-  //visualization
-  for(int i=0;i<x_depth.size();i++){
-    if(x_depth[i].w()<10) {
-      x_depth[i].w() = 0;
-      x_depth[i].x() = 0;
-      x_depth[i].y() = 0;
-      x_depth[i].z() = 0;
-      // cout <<" "<<" ";
-    }else{
-      // cout <<x_depth[i]<<" ";
+    for(int i = 0;i<lenth_of_vector;i++){
+        x_depth.emplace_back(0,0,0,0);
     }
+    
+    for(int i=yolo_u_min; i<yolo_u_max; i = i+grid_z*2){
+      for(int j=yolo_v_min; j<yolo_v_max; j = j+grid_z*2){
+        // uij = i + grid_z;
+        // vij = j + grid_z;
+        grid_depth.emplace_back(x_depth); 
+      }
+    }
+
+     
+    int grid_ave = 1;
+    int array_size = array_pc.size();
+    //ROS_INFO_STREAM("u,v = "<<u0<<", "<<v0);
+    int len_in = grid_z+grid_ave;
+    int len_in2 = len_in*len_in;
+    #pragma omp parallel for
+    for(int pc_id = 0; pc_id < array_size; pc_id++){
+      //pixle coordinate
+      int eu = uv[pc_id].x();
+      int ev = uv[pc_id].y();
+      if(eu>yolo_u_min && eu<yolo_u_max && ev>yolo_v_min && ev<yolo_v_max){
+        int vector_id = 0;
+        for(int i=yolo_u_min; i<yolo_u_max; i = i+grid_z*2){
+          for(int j=yolo_v_min; j<yolo_v_max; j = j+grid_z*2){
+            if(eu>=i && eu<i+grid_z*2 && ev>=j && ev>j+grid_z*2){
+              //ROS_INFO_STREAM("d2="<<d2);
+              //pc_array_feature.push_back(pc_masks[i].point);
+              Vector3d in_box =Vector3d(array_pc[pc_id].x(), array_pc[pc_id].y(), array_pc[pc_id].z()); 
+              // pc_array_yolo.emplace_back(in_box);
+              if(array_pc[pc_id].x()<depth_threshold_up && array_pc[pc_id].x()>depth_threshold_down)//lidar frame
+              {
+                int index = int((array_pc[pc_id].x() - depth_threshold_down)/perception)+1;
+                if(index < lenth_of_vector){
+                  vector<Vector4d> &x_depth_i = grid_depth[vector_id];
+                  x_depth_i[index].x() += in_box.x();
+                  x_depth_i[index].y() += in_box.y();
+                  x_depth_i[index].z() += in_box.z();
+                  x_depth_i[index].w() ++ ;
+                }else{
+                    ROS_ERROR("index error! there is a bug in calculate_yolo_depth_2.");
+                    continue;
+                }
+              }
+    
+            }
+            vector_id++;
+
+          }
+        }  
+      }
+    }
+    
+    //visualization
+    for(int i=0; i<grid_depth.size(); i++){
+      vector<Vector4d> &x_depth_i = grid_depth[i];
+      for(int j=0; j<x_depth_i.size(); j++){
+      
+        if(x_depth_i[j].w()<grid_z*10/3) {
+          x_depth_i[j].w() = 0;
+          x_depth_i[j].x() = 0;
+          x_depth_i[j].y() = 0;
+          x_depth_i[j].z() = 0;
+          // cout <<" "<<" ";
+        }else{
+          // cout <<x_depth[i].w()<<" ";
+        }
+      }
+      // cout<<"========================================================================"<<endl;
+    }
+    // for(int i=0;i<lenth_of_vector;i++){
+    //   if(x_depth[i].w()<10) {
+    //     x_depth[i].w() = 0;
+    //     x_depth[i].x() = 0;
+    //     x_depth[i].y() = 0;
+    //     x_depth[i].z() = 0;
+    //     // cout <<" "<<" ";
+    //   }else{
+    //     // cout <<x_depth[i].w()<<" ";
+    //   }
+    // }
+    // cout<<endl;
+    return;
   }
-  // cout<<endl;
-  return;
+  catch(std::bad_alloc){
+    ROS_ERROR("terminate called after throwing an instance of 'std::bad_alloc'     in calculate_yolo_depth_init.");
+    return;
+  }
 }
 
 
@@ -795,10 +938,10 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   //ROS_INFO_STREAM("pc_manager.mask4.pc_masks_single"<<pc_masks[0].point.G_x);
   for (int i_g = 0; i_g < mask_size; i_g ++){
   
-    double Gr_x=pc_masks[i_g].point.Gr_x;
-    double Gr_y=pc_masks[i_g].point.Gr_y;
-    double Gr_z=pc_masks[i_g].point.Gr_z;
-    double Gs=0;
+    double Gr_x = pc_masks[i_g].point.Gr_x;
+    double Gr_y = pc_masks[i_g].point.Gr_y;
+    double Gr_z = pc_masks[i_g].point.Gr_z;
+    double Gs = 0;
     double G_x = pc_masks[i_g].point.G_x;
     double G_y = pc_masks[i_g].point.G_y;
     double G_z = pc_masks[i_g].point.G_z;
@@ -829,12 +972,12 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     // //   G_z = -G_z;
     // // }
     double d2;
-    for(int u =  pc_masks[i_g].u_down; u<pc_masks[i_g].u_up; u++){
-      for(int v = pc_masks[i_g].v_down; v<pc_masks[i_g].v_up; v++){
+    for(int v = pc_masks[i_g].v_down; v<pc_masks[i_g].v_up; v++){
+      for(int u =  pc_masks[i_g].u_down; u<pc_masks[i_g].u_up; u++){
         d2 = sqrt((u - pu)*(u - pu) + (v-pv)*(v-pv));
-        if(d2<0.01){
+        if(d2<0.0001){
           //ROS_INFO_STREAM("d2 = "<<d2);
-          d2 = 0.01;
+          d2 = 0.0001;
           
         }
         //ROS_INFO_STREAM("d2 = "<<d2);
@@ -847,6 +990,11 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         double y1 = Gs*G_y;
         double y2 = Gs*G_z;
         //m_thread.lock();
+        if(ima3d == NULL || ima3d_ == NULL){
+          ROS_ERROR("ima3d or ima3d_ pointer is NULL! restart!");
+          pc_manager.mask4.malloc_ok = false;
+          return 0;
+        }
         ima3d[index] += x0;
         ima3d[index +1] += x1;
         ima3d[index +2] += x2;
@@ -1049,25 +1197,10 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
 
     //ROS_DEBUG("image published.");
     ROS_DEBUG_STREAM("processing and pub 0.4s data: "<<all_time.toc()<<"ms");
-    // search_box_yolo
-    // if(ifdetection==1){
-      cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-      cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-      cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
-      cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
-      // ROS_INFO_STREAM("box_grid_points.size() = "<<box_grid_points.size());
-      // for(int i = 0;i < box_grid_points.size();i++){
-      //   cv::circle(img_cur, box_grid_points[i], 1, cv::Scalar(0, 255, 0));
-      // }
-      box_grid_points.clear();
-      // ifdetection = 0;
-    // }
-    
-    cv::imshow("image_upsample", image_upsample);
-    cv::imshow("image", img_cur);
+   
     // cv::imshow("img_normalized", img_normalized);
-    cv::Mat channel[3];
-    cv::split(image_upsample, channel);//split into three channels
+    // cv::Mat channel[3];
+    // cv::split(image_upsample, channel);//split into three channels
     
     // char pic1[50];
     // char pic2[50];
@@ -1084,7 +1217,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       
     }
 
-    cv::waitKey(1);
+    
     if(image_save){
       double hz = 0;
       cur_setfre = imgrgb_cur.header.stamp.toSec();
@@ -1095,14 +1228,14 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       }
       hz = 1.0/(cur_setfre - last_setfre);
       ROS_DEBUG_STREAM("hz = "<<hz);
-      if(hz<0.4 && hz>0){
+      if(hz<2.1 && hz>0){
         last_setfre = cur_setfre;
         ROS_DEBUG_STREAM("save iamge");
         
         char png_name_upsampling[100];
         char png_name[100];
-        sprintf(png_name_upsampling, "/media/mao/PortableSSD/mpc_dataset/image/%05dimg_2.png", i_pc_count);
-        sprintf(png_name, "/media/mao/PortableSSD/mpc_dataset/image/%05dimg.png", i_pc_count);
+        sprintf(png_name_upsampling, "/media/mao/PortableSSD/Dataset/mpc_dataset/dataset_image/%05dimg_2.png", i_pc_count);
+        sprintf(png_name, "/media/mao/PortableSSD/Dataset/mpc_dataset/dataset_image/%05dimg.png", i_pc_count);
         i_pc_count ++;
         
         //cv::cvtColor(image_upsample, image_upsample_grey, cv::COLOR_BGR2GRAY);
@@ -1114,8 +1247,8 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         cv::imwrite(png_name_upsampling, image_upsample); //save the image
         cv::imwrite(png_name, img_cur); 
         //cv::waitKey(1);
-        cv::Mat channel[3];
-        cv::split(image_upsample, channel);//split into three channels
+        // cv::Mat channel[3];
+        // cv::split(image_upsample, channel);//split into three channels
         
         // char pic1[50];
         // char pic2[50];
@@ -1124,17 +1257,36 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         // sprintf(pic2, "/tmp/%02dupsamplesave_1.png",nof);
         // sprintf(pic3, "/tmp/%02dupsamplesave_2.png",nof);
         
-        cv::imshow("x of image_upsample", channel[0]);
+        // cv::imshow("x of image_upsample", channel[0]);
         //cv::imwrite(pic1, channel[0]); //save the image
-        cv::imshow("y of image_upsample", channel[1]);
+        // cv::imshow("y of image_upsample", channel[1]);
         //cv::imwrite(pic2, channel[1]); //save the image
-        cv::imshow("z of image_upsample", channel[2]);
+        // cv::imshow("z of image_upsample", channel[2]);
         //cv::imwrite(pic3, channel[2]); //save the image
         //cv::destroyAllWindows();
+        }
+        
       }
+       // search_box_yolo
+      // if(ifdetection==1){
+        cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+        cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+        cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+        cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+        // ROS_INFO_STREAM("box_grid_points.size() = "<<box_grid_points.size());
+        m_visualization.lock();
+        for(int i = 0;i < box_grid_points.size();i++){
+          cv::circle(img_cur, box_grid_points[i], 1, cv::Scalar(0, 255, 0));
+          cv::circle(image_upsample, box_grid_points[i], 1, cv::Scalar(0, 255, 0));
+        }
+        box_grid_points.clear();
+        m_visualization.unlock();
+        // ifdetection = 0;
+      // }
       
-    }
-    
+      cv::imshow("image_upsample", image_upsample);
+      cv::imshow("image", img_cur);
+      cv::waitKey(1);
     }else{
       cur_setfre = 0;
       last_setfre = 0;

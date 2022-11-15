@@ -18,7 +18,7 @@ find_package(catkin  REQUIRED COMPONENTS
   livox_ros_driver
 )
 
-find_package( PCL REQUIRED )
+find_package( PCL 1.2 REQUIRED )
 find_package(OpenCV REQUIRED)
 FIND_PACKAGE( OpenMP REQUIRED)
 if(OPENMP_FOUND)

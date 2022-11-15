@@ -30,6 +30,7 @@
 #include "pcl/PCLPointCloud2.h"
 #include "pcl/conversions.h"
 #include "pcl_ros/transforms.h"
+#include <pcl/filters/statistical_outlier_removal.h>
 #include <vector>
 #include <queue>
 #include <map>
@@ -179,7 +180,20 @@ struct ID_MASK{
         image_size = w_img*h_img*c_img;
         ima3d = (double*)malloc(sizeof(double)*(image_size));
         ima3d_ = (double*)malloc(sizeof(double)*(image_size));
+        if(ima3d == NULL){
+            ROS_ERROR("malloc for ima3d failed!!!! retry.");
+            free(ima3d);
+            malloc_ok = false;
+            return;
+        }
+        if(ima3d_ == NULL){
+            ROS_ERROR("malloc for ima3d_ failed!!!! retry.");
+            free(ima3d_);
+            malloc_ok = false;
+            return;
+        }
         SetZeros();
+        malloc_ok = true;
         //ROS_INFO_STREAM("ID_MASK recalled!!!!!");
         //pc_masks = (Mask_pc*)malloc(sizeof(Mask_pc)*(1));
     };
@@ -204,6 +218,7 @@ struct ID_MASK{
     double timestamp;//ns
     Eigen::Quaterniond q_wb;
     Eigen::Vector3d t_wb;
+    bool malloc_ok = true;
     // Eigen::Matrix4d T_wb;
     // Eigen::Matrix4d T_bw;
     
@@ -227,6 +242,12 @@ class PC_Wrapper{
         ROS_INFO("Reset Init Flag.");
     };
     void UpdateMax3d();
+    
+
+
+
+
+
     ID_MASK mask_win[4];//mask 
     ID_MASK mask4;
     bool init;
@@ -286,10 +307,31 @@ struct Pc_Vector{
 
     vector<Vector3d> pc_lidar_3d;
     vector<Vector2d> pc_uv;
+    
     long long timestamp;
     Eigen::Quaterniond q_wb;
     Eigen::Vector3d t_wb;
+
 };
+bool comp(livox_ros_driver::CustomPoint& a, livox_ros_driver::CustomPoint& b){
+        return a.x<b.x;
+}
+
+
+void fromROS2pcl(pcl::PointCloud<pcl::PointXYZINormal>::Ptr &pcl, livox_ros_driver::CustomMsg::ConstPtr &msg){
+    int pc_size = msg->point_num;
+    pcl::PointXYZINormal point;
+    for(int i = 0; i<pc_size; i++){
+        point.x = msg->points[i].x;
+        point.y = msg->points[i].y;
+        point.z = msg->points[i].z;
+        point.intensity = msg->points[i].reflectivity;
+        point.curvature =
+                msg->points[i].offset_time / float(1000000); //use curvature as time of each laser points
+        pcl->push_back(point);
+    }
+}
+
 
 
 #endif 
@@ -307,6 +349,7 @@ int sum_pc_i = 0;
 double sum_x = 0;
 
 pcl::PointCloud<pcl::PointXYZ> cloud;
+bool pc_first_call = true;
 queue<livox_ros_driver::CustomMsg::ConstPtr> pc_buffer;
 queue<darknet_ros_msgs::BoundingBoxes::ConstPtr> box_buffer;
 queue<Pc_Vector> yolo_pc_buffer;
@@ -318,7 +361,10 @@ queue<sensor_msgs::Image> img_buffer;
 std::mutex m_ekf;
 // control the box buffer, wake up yolo_update thread when there are box datas.
 std::mutex m_yolo;
-std::mutex m_buf, m_feature, m_thread;
+//control of yolo_depth vector
+std::mutex m_visualization;
+std::mutex m_yolo_match;
+std::mutex m_buf, m_feature, m_thread, m_state;
 std::condition_variable con;
 std::condition_variable yolo_con;
 
@@ -351,6 +397,8 @@ Vector3d p_drone, p_drone_cur, p_origin;
 long long cur_timestamp = 0;
 long long pose_timestamp = 0;
 Quaterniond q_drone, q_drone_cur, q_origin;
+queue<Quaterniond> q_drone_buffer;
+queue<Vector3d> p_drone_buffer;
 //T_b0_w
 Matrix4d T_origin = Matrix4d::Identity();
 sensor_msgs::Image img1;
@@ -377,7 +425,7 @@ Eigen::MatrixXd R_variance(6,6);  //covariance of angular velocity and linear ve
 
 queue<Pc_Vector> yolo_depth;
 int up_size = 20;//队列大小
-bool data_matched = false;//判断yolo检测和点云数据是否匹配成功
+
 long long last_yolo_timestamp = 0;
 //yolo box中计算的点云中心
 // double ave_x_last = 0;
@@ -412,7 +460,7 @@ double z_threshold = 20;
 //save image for train
 bool image_save = false;
 //visualization
-bool visualization = false;
+bool visualization = true;
 bool compare_rect = false;
 bool first_loop = false;
 /******************************************/
@@ -424,32 +472,106 @@ void Preprocess(){
                 std::unique_lock<std::mutex> lk(m_buf);
                 con.wait(lk,[&]
                     {
-                            return (!pc_buffer.empty());
+                            return (!img_buffer.empty());
                     });
-                
+                TicToc lock_t;
+                /*start: update pc_buffer, make sure pc in buffer is consecutive*/     
+                std::queue<livox_ros_driver::CustomMsgConstPtr> tmp_pc_buffer;
                 pc_manager.pc_win_buffer[sum_pc_i] = pc_buffer.back();
-                
+                // ROS_INFO_STREAM("mat size = "<<cvMat_buffer.size());
                 img_cur = cvMat_buffer.back();
-                imgrgb_cur = (img_buffer.back());
-                //todo: check timestamp, pop out out data
+                imgrgb_cur = img_buffer.back();
+                //todo: check timestamp, pop out data
                 while(!cvMat_buffer.empty())
                     cvMat_buffer.pop();
                 while(!img_buffer.empty())
                     img_buffer.pop();
-                while(!pc_buffer.empty())
-                    pc_buffer.pop();
+                // ROS_INFO_STREAM("mat size = "<<cvMat_buffer.size());
+                /*start: check timestamp***********************************************************/
+                pc_time_last = pc_time_cur;
+                pc_time_cur = pc_manager.pc_win_buffer[sum_pc_i]->header.stamp.toSec();
+                //时间出现跳变，需要重置
+                if((pc_time_cur-pc_time_last>1.0 || pc_time_cur < pc_time_last) && pc_time_last != 0
+                        || !pc_manager.mask4.malloc_ok || !pc_manager.mask_win[sum_pc_i].malloc_ok){
+                    pc_manager.reset_init();
+                    pc_first_call = true;
+                    flag_int_xkk = 0;
+                    flag_int_xkk_last = 0;
+                    ifdetection = 0;
+                    sum_pc_i = 0;
+                    last_setfre = 0;
+                    while(!yolo_depth.empty())
+                        yolo_depth.pop();
+                    while(!pc_buffer.empty()){
+                        pc_buffer.pop();
+                    }
+                    continue;
+                }
+                /*end: check timestamp***********************************************************/
+                int i_buffer = 0;
+                while(!pc_buffer.empty()){        
+                    if(i_buffer != sum_pc_i){
+                        pc_manager.pc_win_buffer[i_buffer] = pc_buffer.front();
+                    }
+                    i_buffer ++;
+                    tmp_pc_buffer.push(pc_buffer.front());
+                    pc_buffer.pop();                             
+                }
+                while(!tmp_pc_buffer.empty()){
+                    pc_buffer.push(tmp_pc_buffer.front());
+                    tmp_pc_buffer.pop();
+                }
+                
+                
+                /*end: update pc_buffer, make sure pc in buffer is consecutive*/
+
+                
+               
                 pc_manager.UpdateMask(sum_pc_i);
                 int cur_id = pc_manager.current_id;
                 pc_manager.mask_win[cur_id].q_wb = q_drone_cur;
                 pc_manager.mask_win[cur_id].t_wb = p_drone_cur;
                 pc_manager.timestamp = cur_timestamp;
                 pc_manager.mask4.timestamp = cur_timestamp;
+                /*update pose*/
+                std::queue<Quaterniond> tmp_q_drone;
+                std::queue<Vector3d> tmp_p_drone;
+                i_buffer = 0;
+                // ROS_INFO_STREAM("q_drone_buffer size = "<<q_drone_buffer.size());
+                while(!q_drone_buffer.empty()){         
+                    if(i_buffer != cur_id){
+                        pc_manager.mask_win[i_buffer].q_wb = q_drone_buffer.front();;
+                    }
+                    // ROS_INFO_STREAM("ibuffer = "<<i_buffer);
+                    i_buffer ++;
+                    tmp_q_drone.push(q_drone_buffer.front());
+                    q_drone_buffer.pop();                             
+                }
+                while(!tmp_q_drone.empty()){
+                    q_drone_buffer.push(tmp_q_drone.front());
+                    tmp_q_drone.pop();
+                }
+                i_buffer = 0;
+                while(!p_drone_buffer.empty()){        
+                    if(i_buffer != cur_id){
+                        pc_manager.mask_win[i_buffer].t_wb = p_drone_buffer.front();;
+                    }
+                    i_buffer ++;
+                    tmp_p_drone.push(p_drone_buffer.front());
+                    p_drone_buffer.pop();                             
+                }
+                while(!tmp_p_drone.empty()){
+                    p_drone_buffer.push(tmp_p_drone.front());
+                    tmp_p_drone.pop();
+                }
+                
 
+                // ROS_INFO_STREAM("lock time = "<<lock_t.toc()<<" ms");
                 m_buf.unlock();
                 
                         
                 all_time.tic();
-                ROS_INFO("pc received");
+                // ROS_INFO("pc received");
                 ROS_DEBUG_STREAM("sum_pc_i: "<<sum_pc_i);
                 
                 //pcl::fromROSMsg (pc_msg, cloud);
@@ -457,7 +579,7 @@ void Preprocess(){
                 sum_pc_i ++;
                 if (sum_pc_i == sum_pc){
                     sum_pc_i = 0;
-                    pc_manager.set_init();
+                    // pc_manager.set_init();
                 }
                 
 
@@ -470,7 +592,7 @@ void Preprocess(){
                 // pc_manager.mask_win[cur_id].T_bw.block<3,1>(0,3) = -1*pc_manager.mask_win[cur_id].T_bw.block<3,3>(0,0)*p_drone_cur;
                 
                 //  pc_manager.mask_win[pc_manager.current_id].ResetMaskSize(cloud.points.size());
-                if(!pc_manager.init) continue;
+                // if(!pc_manager.init) continue;
 
                 //int grid = 5;
             
@@ -546,6 +668,11 @@ void Preprocess(){
                 pc_vector.timestamp = imgrgb_cur.header.stamp.toNSec();//这里不能用cur_timestamp，因为这里已经解锁了，所以这个变量可能已近更新了
                 pc_vector.q_wb = pc_manager.mask_win[cur_id].q_wb;
                 pc_vector.t_wb = pc_manager.mask_win[cur_id].t_wb;
+                int total_size = pc_manager.pc_win_buffer[0]->points.size() + pc_manager.pc_win_buffer[1]->points.size() + pc_manager.pc_win_buffer[2]->points.size() + pc_manager.pc_win_buffer[3]->points.size();
+                pc_vector.pc_lidar_3d.reserve(total_size/2+2);
+                pc_vector.pc_uv.reserve(total_size/2+2);
+                pc_manager.mask4.pc_masks_single.clear();
+                pc_manager.mask4.pc_masks_single.reserve(total_size/2+2);
                 //#pragma omp parallel for
                 for(int k =0; k<sum_pc; k++){
                 
@@ -553,14 +680,35 @@ void Preprocess(){
                     double* ima3d = pc_manager.mask_win[k].ima3d;
                     double* ima3d_ = pc_manager.mask_win[k].ima3d_;
                     livox_ros_driver::CustomMsg::ConstPtr pc_msg = pc_manager.pc_win_buffer[k];
+                    /*********************************************************************************/
+                    //pcl
+                    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+                    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
+                    // pcl::PointCloud<pcl::PointXYZINormal>::Ptr pl_surf (new pcl::PointCloud<pcl::PointXYZINormal>);
+                    // pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZINormal>);
+                    // pl_surf->clear();
+                    // pl_surf->reserve(pc_msg->point_num+1);
+                    // cloud_filtered->clear();
+                    // cloud_filtered->reserve(pc_msg->point_num+1);
+                    // fromROS2pcl(pl_surf, pc_msg);
+                    // pcl::StatisticalOutlierRemoval<pcl::PointXYZINormal> sor;
+                    // sor.setInputCloud (pl_surf);
+                    // sor.setMeanK (50);
+                    // sor.setStddevMulThresh (1.0);
+                    // sor.filter (*cloud_filtered);
+                    /************************************************************************************/
+
+
+                    //sort(pc_msg.points.begin(), pc_msg.points.end(), comp);
                     //Matrix4d T_cam0_L1 =  pc_manager.mask_win[pc_manager.current_id].T_bw * pc_manager.mask_win[pc_manager.current_id].T_wb * T_imu_lidar;
                     Quaterniond q_b0_b1 = pc_manager.mask_win[cur_id].q_wb.inverse()*pc_manager.mask_win[k].q_wb;
                     Vector3d t_b0_b1 = pc_manager.mask_win[cur_id].q_wb.inverse()*(pc_manager.mask_win[k].t_wb-pc_manager.mask_win[cur_id].t_wb);
                     // ROS_INFO_STREAM("relative p = ("<<t_b0_b1.x()<<", "<<t_b0_b1.y()<<", "<<t_b0_b1.z()<<")");
                     // ROS_INFO_STREAM("relative q = \n"<<q_b0_b1.toRotationMatrix().matrix());
                     Matrix3d R_b0_lidar = q_b0_b1*R_imu_lidar;
-                    Vector3d t_b0_lidar = pc_manager.mask_win[cur_id].q_wb.inverse()*(pc_manager.mask_win[k].q_wb*t_imu_lidar) + t_b0_b1;
-                    
+                    // Vector3d t_b0_lidar = pc_manager.mask_win[cur_id].q_wb.inverse()*(pc_manager.mask_win[k].q_wb*t_imu_lidar) + t_b0_b1;
+                    Vector3d t_b0_lidar = q_b0_b1*t_imu_lidar + t_b0_b1;
+
                     Matrix3d R_lidar0_lidar = R_imu_lidar.inverse()*R_b0_lidar;
                     Vector3d t_lidar0_lidar = R_imu_lidar.inverse()*(t_b0_lidar)-R_imu_lidar.inverse()*t_imu_lidar;
                     Matrix3d R_cam0_lidar = R_cam_imu*R_b0_lidar;
@@ -568,7 +716,20 @@ void Preprocess(){
                     Matrix3d R_uv0_lidar = K_in*R_cam0_lidar;
                     Vector3d t_uv0_lidar = K_in*t_cam0_lidar;
                     Vector3d cam_offset = Vector3d(0,0,0);
-                    
+                    /*********************************************************************/
+                    // pointcoordinate zerothispoint
+                    // for(int i = 0; i<pc_size; i=i+2){
+                    //     // m_thread.lock();
+                    //     pc_manager.mask4.pc_masks_single.emplace_back(zerothispoint, grid);
+                    //     pc_vector.pc_lidar_3d.emplace_back(0,0,0);
+                    //     pc_vector.pc_uv.emplace_back(0, 0);
+                    //     // pc_vector.pc_3d_uv.emplace_back(pc_lidar.x(), pc_lidar.y(), pc_lidar.z(), pu, pv);
+                    //     // m_thread.unlock();    
+                    // }
+                    /***************************************************************/
+
+
+
                     #pragma omp parallel for//会导致每组数据的处理时间有一些不稳定性存在，但是整体时间上是缩短的，如果不用并行，全部处理的平均时间大概在100ms
                     for (int i=0; i< pc_size; i=i+2){
                         
@@ -576,7 +737,10 @@ void Preprocess(){
                         Eigen::Vector3d pc_lidar;
                         Eigen::Vector3d pc_i;
                         //if(i%2 == 0) continue;//如果不筛一半，不并行的话，处理时间大概在180ms
+                        // pc_i<< cloud_filtered-> , pc_msg->points[i].y, pc_msg->points[i].z;
                         pc_i<< pc_msg->points[i].x, pc_msg->points[i].y, pc_msg->points[i].z;
+                        // ROS_INFO_STREAM("time: "<<pc_msg->points[i].offset_time);
+                        // ROS_INFO_STREAM("pc_i.x = "<<pc_i.x());
                         if(pc_i.x()<1 && pc_i.y()<1 && pc_i.z()<1){
                             
                             pickout_n ++;
@@ -637,12 +801,16 @@ void Preprocess(){
                             double dx = abs(pc_lidar.x());
                             double dy = abs(pc_lidar.y());
                             double dz = abs(pc_lidar.z());
-                            if(dy<0.01){
-                            dy = 0.01;
+                            if(dy<0.0001){
+                            dy = 0.0001;
                             //ROS_INFO_STREAM("dy = "<<dy);
                             }
-                            if(dx<0.01){
-                            dx = 0.01;
+                            if(dx<0.0001){
+                            dx = 0.0001;
+                            //ROS_INFO_STREAM("dy = "<<dy);
+                            }
+                            if(dz<0.0001){
+                            dz = 0.0001;
                             //ROS_INFO_STREAM("dy = "<<dy);
                             }
                             thispoint.Gr_x = 1.0/sqrt(dx);
@@ -661,16 +829,19 @@ void Preprocess(){
                             pc_manager.mask4.pc_masks_single.emplace_back(thispoint, grid);
                             pc_vector.pc_lidar_3d.emplace_back(pc_lidar);
                             pc_vector.pc_uv.emplace_back(pu, pv);
+                            // pc_vector.pc_3d_uv.emplace_back(pc_lidar.x(), pc_lidar.y(), pc_lidar.z(), pu, pv);
                             m_thread.unlock();    
                                     
                         }
                     }
                 }
+                m_yolo_match.lock();
                 if(yolo_depth.size()>up_size)
                 {
                     yolo_depth.pop();
                 }
                 yolo_depth.push(pc_vector);
+                m_yolo_match.unlock();
                 pc_vector.pc_lidar_3d.clear();
                 //ROS_INFO_STREAM("sizeof: "<<yolo_depth.back().pc_cam_3d.size());
                 //ROS_INFO_STREAM("num_outliner = "<<num_outliner);
@@ -772,39 +943,59 @@ void Preprocess(){
                 // minmaxuv.vmax = h_img/2;
                 // minmaxuv.vmin = 900;
                 cloud.clear();
+                // ROS_INFO_STREAM("process thread t = "<<all_time.toc()<<" ms");
             }catch(std::bad_alloc){
-               ROS_ERROR("terminate called after throwing an instance of 'std::bad_alloc'     continue.");
+               ROS_ERROR("terminate called after throwing an instance of 'std::bad_alloc'     in pc_processing part");
+
                continue;
           }
      }
      
 }
-bool pc_first_call = true;
+
 // void pc2Callback(const sensor_msgs::PointCloud2ConstPtr& pc_msg){
 void pc2Callback(const livox_ros_driver::CustomMsg::ConstPtr &pc_msg){
-    pc_time_last = pc_time_cur;
-    pc_time_cur = pc_msg->header.stamp.toSec();
-    //时间出现跳变，需要重置
-    if((pc_time_cur-pc_time_last>1.0 || pc_time_cur < pc_time_last) && pc_time_last != 0){
-        pc_manager.reset_init();
-        pc_first_call = true;
-    }
-    m_buf.lock();
-    if(pc_first_call){
-        p_origin = p_drone;
-        q_origin = q_drone;
-        
-        T_origin.block<3,3>(0,0) = q_origin.toRotationMatrix().inverse();
-        T_origin.block<3,1>(0,3) = q_origin.inverse() * -p_origin;
-        pc_first_call = false;
-    }
-    img_buffer.push(imgrgb);
-    cvMat_buffer.push(img);
-    pc_buffer.push(pc_msg);
+    
+    TicToc pc_callback_t;
+    m_state.lock();
     p_drone_cur = p_drone;
     q_drone_cur = q_drone;
+    m_state.unlock();
+
+
+
+    m_buf.lock();
+    if(pc_first_call){
+        // p_origin = p_drone;
+        // q_origin = q_drone;
+        
+        // T_origin.block<3,3>(0,0) = q_origin.toRotationMatrix().inverse();
+        // T_origin.block<3,1>(0,3) = q_origin.inverse() * -p_origin;
+        pc_first_call = false;
+    }
+
+    p_drone_buffer.push(p_drone_cur);
+    while(p_drone_buffer.size()>4){
+        p_drone_buffer.pop();
+    }
+    q_drone_buffer.push(q_drone_cur);
+    while(q_drone_buffer.size()>4){
+        q_drone_buffer.pop();
+    }
+
+
+    img_buffer.push(imgrgb);
+    cvMat_buffer.push(img);
+    // ROS_INFO_STREAM("size of cvMat = "<<cvMat_buffer.size());
+    pc_buffer.push(pc_msg);
+    /*keep pc_buffer.size == 4*/
+    while(pc_buffer.size()>4){
+        pc_buffer.pop();
+    }
+    int pc_buffer_size = pc_buffer.size();
     cur_timestamp = imgrgb.header.stamp.toNSec();//yolo的时间戳是和图像一致的
     m_buf.unlock();
+
     //update feature point synchronized with pc timestamp
     m_feature.lock();
     Vector3d rect_uav_pos_world = Vector3d(rect_feat_point[0], rect_feat_point[1], rect_feat_point[2]);
@@ -814,13 +1005,18 @@ void pc2Callback(const livox_ros_driver::CustomMsg::ConstPtr &pc_msg){
     u0 = feat_point[0];
     v0 = feat_point[1];
     m_feature.unlock();
-
-    con.notify_one();
+    if(pc_buffer_size == 4){
+        pc_manager.set_init();
+        con.notify_one();
+    }
+        
     //ROS_INFO("push pc into puffer");
+    // ROS_INFO_STREAM("PC_callback_time = "<<pc_callback_t.toc()<<" ms");
 }
 
 void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
 {
+    TicToc img_callback_t;
 	cv_bridge::CvImagePtr cv_ptr;
 
 	//cout << "encoding: " << msg->encoding << endl; //bgr8a
@@ -829,7 +1025,8 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
      cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
       //cv::Mat img  = cv_ptr -> image;
      img  = cv_ptr -> image;
-
+    // cv::imshow("img", img);
+    // cv::waitKey(1);
      imgrgb = *msg;
 
      // cv::imshow("image", img);
@@ -844,8 +1041,11 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
 	c_img = img.channels();
      //ROS_DEBUG("image width: %d, height: %d, channels: %d.", w_img, h_img, c_img);
 	//}
+    // ROS_INFO_STREAM("image callback time = "<<img_callback_t.toc()<<" ms");
 }
 
 Vector3d calculate_yolo_depth(vector<Vector3d> &array_pc, vector<Vector2d> &uv, double u0, double v0, int grid_z);
 void PC_EKF_uodate(Vector3d measurements);
 void calculate_yolo_depth_init(vector<Vector3d> &array_pc, vector<Vector2d> &uv, vector<Vector4d> &x_depth, double u0, double v0, int grid_z, double perception, double depth_threshold_down, double depth_threshold_up);
+void calculate_yolo_depth_2(vector<Vector3d> &array_pc, vector<Vector2d> &uv, vector<vector<Vector4d>> &grid_depth, double yolo_u_min, double yolo_u_max, double yolo_v_min, double yolo_v_max, 
+                                        int grid_z, double perception, double depth_threshold_down, double depth_threshold_up);
