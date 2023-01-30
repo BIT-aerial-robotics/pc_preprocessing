@@ -290,7 +290,8 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
      darknet_ros_msgs::BoundingBoxes boundingBoxesResults_ = *msg;
      int boxno = boundingBoxesResults_.bounding_boxes.size();
      long long cur_yolo_timestamp = msg->header.stamp.toNSec();
-     // ROS_INFO_STREAM("timestamp = "<<cur_yolo_timestamp);
+     ROS_INFO_STREAM("timestamp = "<<cur_yolo_timestamp);
+     ROS_INFO_STREAM("timestamp_last = "<<last_yolo_timestamp);
      Pc_Vector yolo_cur_pc_data;
      if(boxno == 0){
           ROS_ERROR("nox = 0 !!!!!");
@@ -306,7 +307,7 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
      //data match
      m_yolo_match.lock();
      while(!yolo_depth.empty()){
-          // ROS_INFO_STREAM("yolo_depth.front().timestamp = "<<yolo_depth.front().timestamp);
+          ROS_INFO_STREAM("yolo_depth.front().timestamp = "<<yolo_depth.front().timestamp);
           if(cur_yolo_timestamp >= yolo_depth.front().timestamp){
                if(cur_yolo_timestamp == yolo_depth.front().timestamp){
                     yolo_cur_pc_data = yolo_depth.front();
@@ -320,7 +321,8 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
                }
           }else{
                ROS_ERROR("The matched data has been poped out!");
-               yolo_depth.pop();
+               m_yolo_match.unlock();
+               return;
           }
      }
      if(yolo_depth.empty() && !data_matched){
@@ -589,7 +591,7 @@ void Yolo_Update(){
                if(grid_k>10){
                     grid_k = 10;
                }
-               ROS_INFO_STREAM("grid_k = "<<grid_k);
+               // ROS_INFO_STREAM("grid_k = "<<grid_k);
                // }
                // catch(std::bad_alloc){
                //      ROS_ERROR("terminate called after throwing an instance of 'std::bad_alloc'     in yolo depth estimation part 1.");
@@ -807,20 +809,25 @@ void Yolo_Update(){
                     
                     /********/
                     Q_variance<<
-                              0, 0, 0,
+                              0.25, 0, 0,
                               0, 0.01, 0,
                               0, 0, 0.01;
-                    Matrix3d f1, sigma_yolo_x;
-                    f1<<rect_uav_pose_cam.x()/fx, 0, 0,
-                         0, rect_uav_pose_cam.x()/fy,0,
-                         0, 0, 1;
+                    // Matrix3d f1,sigma_yolo_x;
+                    Matrix2d sigma_yolo_x;
+                    MatrixXd f1(3,2);
+                    f1<<rect_uav_pose_cam.x()/fx, 0,
+                         0, rect_uav_pose_cam.x()/fy,
+                         0, 0;
+                    // sigma_yolo_x<<
+                    //                sigma_feature[0], 0, 0,
+                    //                0, sigma_feature[1], 0,
+                    //                0, 0, 0;
                     sigma_yolo_x<<
-                                   sigma_feature[0], 0, 0,
-                                   0, sigma_feature[1], 0,
-                                   0, 0, 0.25;
-                    Q_variance = R_cam_lidar.transpose()*f1*sigma_yolo_x*f1*R_cam_lidar + Q_variance;
-                    // ROS_INFO_STREAM("Q_variance = "<<endl<<Q_variance.matrix());
-                    // ROS_INFO_STREAM("sigma_feature = "<< sigma_feature[0]<<", "<<sigma_feature[1]);
+                                   sigma_feature[0], 0,
+                                   0, sigma_feature[1];
+                    Q_variance = R_cam_lidar.transpose()*f1*sigma_yolo_x*f1.transpose()*R_cam_lidar + Q_variance;
+                    ROS_INFO_STREAM("Q_variance = "<<endl<<Q_variance.matrix());
+                    ROS_INFO_STREAM("sigma_feature = "<< sigma_feature[0]<<", "<<sigma_feature[1]);
                     /*********/
                     y = z_k - C_T*x_k_k;   //nonlinear
                     S=C_T*P_k_k*C_T.transpose() + Q_variance; //observation

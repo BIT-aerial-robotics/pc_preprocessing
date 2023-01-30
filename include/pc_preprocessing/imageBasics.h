@@ -453,15 +453,15 @@ Eigen::MatrixXd T_pc_ima(4,4);
 Eigen::MatrixXd T_cam_lidar(4,4);
 pthread_t tids[4];
 //points clond threshold
-double x_threshold = 100;
+double x_threshold = 200;
 double y_threshold = 20;
 double z_threshold = 20;
 
 //save image for train
 bool image_save = false;
 //visualization
-bool visualization = true;
-bool compare_rect = false;
+bool visualization = false;
+bool compare_rect = true;
 bool first_loop = false;
 /******************************************/
 

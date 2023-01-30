@@ -1011,7 +1011,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     double* ima3d = pc_manager.mask_win[mask_id].ima3d;
     double* ima3d_ = pc_manager.mask_win[mask_id].ima3d_;
     int mask_size_no_rect = pc_masks_no_rect.size();
-    ROS_INFO_STREAM("mask size = "<<mask_size_no_rect);
+    // ROS_INFO_STREAM("mask size = "<<mask_size_no_rect);
     for (int i_g = 0; i_g < mask_size_no_rect; i_g ++){
       double Gr_x=0, Gr_y=0, Gr_z=0, Gs=0;
       double G_x = 0, G_y = 0, G_z=0;
@@ -1106,8 +1106,8 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
           int index = vali*image_upsample.cols*c + uali*c;
 
           data_ptr[2] = (unsigned char)(255.0*( (pc_manager.mask_win[0].ima3d_[index]+pc_manager.mask_win[1].ima3d_[index]+pc_manager.mask_win[2].ima3d_[index]+pc_manager.mask_win[3].ima3d_[index])/(pc_manager.mask_win[0].ima3d[index]+pc_manager.mask_win[1].ima3d[index]+pc_manager.mask_win[2].ima3d[index]+pc_manager.mask_win[3].ima3d[index]))/maxima3d_no_rect[0]);
-          data_ptr[1] = (unsigned char)(255.0*( (pc_manager.mask_win[0].ima3d_[index+1]+pc_manager.mask_win[1].ima3d_[index+1]+pc_manager.mask_win[2].ima3d_[index+1]+pc_manager.mask_win[3].ima3d_[index+1])/(pc_manager.mask_win[0].ima3d[index+1]+pc_manager.mask_win[1].ima3d[index+1]+pc_manager.mask_win[2].ima3d[index+1]+pc_manager.mask_win[3].ima3d[index+1]))/maxima3d_no_rect[1]);
-          data_ptr[0] = (unsigned char)(255.0*( (pc_manager.mask_win[0].ima3d_[index+2]+pc_manager.mask_win[1].ima3d_[index+2]+pc_manager.mask_win[2].ima3d_[index+2]+pc_manager.mask_win[3].ima3d_[index+2])/(pc_manager.mask_win[0].ima3d[index+2]+pc_manager.mask_win[1].ima3d[index+2]+pc_manager.mask_win[2].ima3d[index+2]+pc_manager.mask_win[3].ima3d[index+2]))/maxima3d_no_rect[2]);
+          data_ptr[0] = (unsigned char)(255.0*( (pc_manager.mask_win[0].ima3d_[index+1]+pc_manager.mask_win[1].ima3d_[index+1]+pc_manager.mask_win[2].ima3d_[index+1]+pc_manager.mask_win[3].ima3d_[index+1])/(pc_manager.mask_win[0].ima3d[index+1]+pc_manager.mask_win[1].ima3d[index+1]+pc_manager.mask_win[2].ima3d[index+1]+pc_manager.mask_win[3].ima3d[index+1]))/maxima3d_no_rect[1]);
+          data_ptr[1] = (unsigned char)(255.0*( (pc_manager.mask_win[0].ima3d_[index+2]+pc_manager.mask_win[1].ima3d_[index+2]+pc_manager.mask_win[2].ima3d_[index+2]+pc_manager.mask_win[3].ima3d_[index+2])/(pc_manager.mask_win[0].ima3d[index+2]+pc_manager.mask_win[1].ima3d[index+2]+pc_manager.mask_win[2].ima3d[index+2]+pc_manager.mask_win[3].ima3d[index+2]))/maxima3d_no_rect[2]);
  
       }
     }
@@ -1268,17 +1268,17 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         
       }
        // search_box_yolo
-      // if(ifdetection==1){
-        cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-        cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-        cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
-        cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
-        // ROS_INFO_STREAM("box_grid_points.size() = "<<box_grid_points.size());
+      // // if(ifdetection==1){
+        // cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+        // cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+        // cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+        // cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+        // // ROS_INFO_STREAM("box_grid_points.size() = "<<box_grid_points.size());
         m_visualization.lock();
-        for(int i = 0;i < box_grid_points.size();i++){
-          cv::circle(img_cur, box_grid_points[i], 1, cv::Scalar(0, 255, 0));
-          cv::circle(image_upsample, box_grid_points[i], 1, cv::Scalar(0, 255, 0));
-        }
+        // for(int i = 0;i < box_grid_points.size();i++){
+        //   cv::circle(img_cur, box_grid_points[i], 1, cv::Scalar(0, 255, 0));
+        //   cv::circle(image_upsample, box_grid_points[i], 1, cv::Scalar(0, 255, 0));
+        // }
         box_grid_points.clear();
         m_visualization.unlock();
         // ifdetection = 0;
