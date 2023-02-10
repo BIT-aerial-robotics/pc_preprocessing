@@ -290,8 +290,8 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
      darknet_ros_msgs::BoundingBoxes boundingBoxesResults_ = *msg;
      int boxno = boundingBoxesResults_.bounding_boxes.size();
      long long cur_yolo_timestamp = msg->header.stamp.toNSec();
-     ROS_INFO_STREAM("timestamp = "<<cur_yolo_timestamp);
-     ROS_INFO_STREAM("timestamp_last = "<<last_yolo_timestamp);
+     // ROS_INFO_STREAM("timestamp = "<<cur_yolo_timestamp);
+     // ROS_INFO_STREAM("timestamp_last = "<<last_yolo_timestamp);
      Pc_Vector yolo_cur_pc_data;
      if(boxno == 0){
           ROS_ERROR("nox = 0 !!!!!");
@@ -307,7 +307,7 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
      //data match
      m_yolo_match.lock();
      while(!yolo_depth.empty()){
-          ROS_INFO_STREAM("yolo_depth.front().timestamp = "<<yolo_depth.front().timestamp);
+          ROS_DEBUG_STREAM("yolo_depth.front().timestamp = "<<yolo_depth.front().timestamp);
           if(cur_yolo_timestamp >= yolo_depth.front().timestamp){
                if(cur_yolo_timestamp == yolo_depth.front().timestamp){
                     yolo_cur_pc_data = yolo_depth.front();
@@ -522,13 +522,13 @@ Vector3d depth_estimate(vector<vector<Vector4d>> &ave_grid_3d, double yolo_u_min
                     // ROS_INFO_STREAM("uav_position = "<<uav_final_pos.x()<<", "<<uav_final_pos.y()<<", "<<uav_final_pos.z());
                     if(uav_final_pos.x()<1){
                          //failed results
-                         ROS_ERROR("estimated depth < 1m, depth estimation failed! continue !");
+                         ROS_ERROR_STREAM("estimated depth = "<<uav_final_pos<<"m < 1m, depth estimation failed! continue !");
                     }
                     return uav_final_pos;
                }
                if(k > k_threshold){
                     uav_final_pos = -Vector3d::Identity();
-                    ROS_ERROR("k>k_threshold. Initialization fault!!");
+                    ROS_ERROR_STREAM("k ="<<k<<" >k_threshold = "<<k_threshold<<". Initialization fault!!");
                     return uav_final_pos;
                }
           }
@@ -826,8 +826,8 @@ void Yolo_Update(){
                                    sigma_feature[0], 0,
                                    0, sigma_feature[1];
                     Q_variance = R_cam_lidar.transpose()*f1*sigma_yolo_x*f1.transpose()*R_cam_lidar + Q_variance;
-                    ROS_INFO_STREAM("Q_variance = "<<endl<<Q_variance.matrix());
-                    ROS_INFO_STREAM("sigma_feature = "<< sigma_feature[0]<<", "<<sigma_feature[1]);
+                    ROS_DEBUG_STREAM("Q_variance = "<<endl<<Q_variance.matrix());
+                    ROS_DEBUG_STREAM("sigma_feature = "<< sigma_feature[0]<<", "<<sigma_feature[1]);
                     /*********/
                     y = z_k - C_T*x_k_k;   //nonlinear
                     S=C_T*P_k_k*C_T.transpose() + Q_variance; //observation
@@ -879,7 +879,7 @@ int main(int argc, char **argv)
 {
      ros::init(argc, argv, "pc_preprocessing");
      ros::NodeHandle n("~");
-     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
+     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
      ros::Subscriber subpc = n.subscribe("/livox/lidar", 20, pc2Callback);
      ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1, imgCallback);
      ros::Subscriber subpos = n.subscribe("/mavros/local_position/pose", 100, poseCallback);
@@ -887,8 +887,8 @@ int main(int argc, char **argv)
 
      ros::Subscriber subdetection = n.subscribe("/darknet_ros/bounding_boxes", 1, detectCallback);  //dependency: darknet_ros_msgs
 
-     pubimg = n.advertise<sensor_msgs::Image>("/camera/rgb/image_raw",  100);
-     pubimg_upsample = n.advertise<sensor_msgs::Image>("/camera/xyz/image_upsampling",  100);
+     pubimg = n.advertise<sensor_msgs::Image>("/camera/rgb/image_raw",  10);
+     pubimg_upsample = n.advertise<sensor_msgs::Image>("/camera/xyz/image_upsampling",  10);
      v_ekf = n.advertise<geometry_msgs::PointStamped>("/vekf",100);
      K_in<<
         264.0, 0, 343.76,

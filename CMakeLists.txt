@@ -12,10 +12,11 @@ find_package(catkin  REQUIRED COMPONENTS
   rospy
   std_msgs
   sensor_msgs
-  cv_bridge
+  
   image_transport
   darknet_ros_msgs
   livox_ros_driver
+  cv_bridge
 )
 
 find_package( PCL 1.2 REQUIRED )
@@ -63,8 +64,8 @@ target_link_libraries(pc_prep ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS
 
 
 
-add_executable(extract_image src/extract_image.cpp include/pc_preprocessing/imageBasics.h)
-target_link_libraries(extract_image ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PROJECT_NAME}_lib ${PYTHON_INCLUDE_DIRS})
+# add_executable(extract_image src/extract_image.cpp include/pc_preprocessing/imageBasics.h)
+# target_link_libraries(extract_image ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PROJECT_NAME}_lib ${PYTHON_INCLUDE_DIRS})
 
 
  

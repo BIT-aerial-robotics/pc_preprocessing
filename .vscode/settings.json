@@ -74,5 +74,6 @@
         "string": "cpp",
         "string_view": "cpp",
         "*.ipp": "cpp"
-    }
+    },
+    "C_Cpp.errorSquiggles": "enabled"
 }
