@@ -1303,7 +1303,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     //cv::Mat image_upsample2 = cv::Mat::zeros(h, w, CV_8UC(3)); //initialize the mat variable according to the size of image
 
     cv_bridge::CvImage out_msg;
-    out_msg.header   = imgrgb_cur.header; // Same timestamp and tf frame as input image
+    out_msg.header   = imgrgb_cur->header; // Same timestamp and tf frame as input image
     // ROS_INFO_STREAM("timestamp_img = "<<out_msg.header.stamp.toNSec());
     out_msg.encoding = sensor_msgs::image_encodings::BGR8; //gbr8
     out_msg.image    = image_upsample; // Your cv::Mat
@@ -1319,9 +1319,9 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
 
 
     //ROS_DEBUG("image published.");
-    ROS_DEBUG_STREAM("processing and pub 0.4s data: "<<all_time.toc()<<"ms\n");
+    ROS_DEBUG_STREAM("processing and pub 0.4s data: "<<all_time.toc()<<"ms");
     ave_total = (ave_total*(i_n-1) + all_time.toc())/i_n;
-    ROS_DEBUG_STREAM("ave total: "<<ave_total<<"ms");
+    ROS_DEBUG_STREAM("ave total: "<<ave_total<<"ms\n");
     
     
     if(compare_rect){
@@ -1332,7 +1332,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     
     if(image_save){
       double hz = 0;
-      cur_setfre = imgrgb_cur.header.stamp.toSec();
+      cur_setfre = imgrgb_cur->header.stamp.toSec();
       if(last_setfre == 0){
         last_setfre = cur_setfre;
         ROS_INFO("return");

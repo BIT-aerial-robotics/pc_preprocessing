@@ -307,10 +307,10 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
      //data match
      m_yolo_match.lock();
      while(!yolo_depth.empty()){
-          ROS_DEBUG_STREAM("yolo_depth.front().timestamp = "<<yolo_depth.front().timestamp);
-          if(cur_yolo_timestamp >= yolo_depth.front().timestamp){
-               if(cur_yolo_timestamp == yolo_depth.front().timestamp){
-                    yolo_cur_pc_data = yolo_depth.front();
+          ROS_DEBUG_STREAM("yolo_depth.front().timestamp = "<<yolo_depth.front()->timestamp);
+          if(cur_yolo_timestamp >= yolo_depth.front()->timestamp){
+               if(cur_yolo_timestamp == yolo_depth.front()->timestamp){
+                    yolo_cur_pc_data = *yolo_depth.front();
                     data_matched = true;
                     // ROS_INFO("data matched!!!");
                     last_yolo_timestamp = cur_yolo_timestamp;

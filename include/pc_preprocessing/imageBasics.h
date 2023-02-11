@@ -94,6 +94,14 @@ double fx = 264.0;
 double fy = 263.700000000000;
 double cx = 343.760000000000;
 double cy = 183.879500000000; 
+
+
+
+
+
+
+
+
 enum ESampleType
 {
 	NOISE = 1,
@@ -164,10 +172,10 @@ struct Mask_pc{
     void SetMask(pointcoordinate _point,int _grid){
         point = _point;
         grid = _grid;
-        u_down =  (int)(point.u_px- grid);
-        u_up = (int)(point.u_px + grid);
-        v_down = (int)( point.v_px- grid);
-        v_up = (int)(point.v_px + grid);
+        u_down =  round(point.u_px)- grid;
+        u_up = round(point.u_px) + grid;
+        v_down = round( point.v_px)- grid;
+        v_up = round(point.v_px) + grid;
         //valid_pixles = (u_up-u_down)*(v_up-v_down); 
     }
     int u_up, u_down, v_up, v_down;//[down,up)
@@ -320,12 +328,14 @@ struct Pc_Vector{
 
     vector<Vector3d> pc_lidar_3d;
     vector<Vector2d> pc_uv;
-    
+    // vector<livox_ros_driver::CustomMsg::ConstPtr> pc_lidar;
     long long timestamp;
     Eigen::Quaterniond q_wb;
     Eigen::Vector3d t_wb;
 
 };
+typedef shared_ptr< Pc_Vector > Pc_Vector_Ptr;
+
 bool comp(livox_ros_driver::CustomPoint& a, livox_ros_driver::CustomPoint& b){
         return a.x<b.x;
 }
@@ -364,6 +374,7 @@ double sum_x = 0;
 //calculate ave time
 int i_n = 0;
 double ave_lock = 0;
+double ave_lock_i = 0;
 double ave_mask_process = 0;
 double ave_mask_process_i = 0;
 double ave_mask_cal = 0;
@@ -380,7 +391,7 @@ queue<Pc_Vector> yolo_pc_buffer;
 double pc_time_cur = 0;
 double pc_time_last = 0;
 queue<cv::Mat> cvMat_buffer;
-queue<sensor_msgs::Image> img_buffer;
+queue<sensor_msgs::ImageConstPtr> img_buffer;
 // lock when ekf state is freshing
 std::mutex m_ekf;
 // control the box buffer, wake up yolo_update thread when there are box datas.
@@ -447,8 +458,8 @@ Matrix3d C_T = Matrix3d::Identity();
 Eigen::Matrix3d  Q_variance;  //covariance of feature position in the sensor frame
 Eigen::MatrixXd R_variance(6,6);  //covariance of angular velocity and linear velocity
 
-queue<Pc_Vector> yolo_depth;
-int up_size = 20;//队列大小
+queue<Pc_Vector_Ptr> yolo_depth;
+int up_size = 15;//队列大小
 
 long long last_yolo_timestamp = 0;
 //yolo box中计算的点云中心
@@ -464,8 +475,8 @@ vector<cv::Point2d> box_grid_points;
 ros::Publisher pubimg;
 ros::Publisher pubimg_upsample;
 ros::Publisher v_ekf;
-sensor_msgs::Image imgrgb;
-sensor_msgs::Image imgrgb_cur;
+sensor_msgs::ImageConstPtr imgrgb;
+sensor_msgs::ImageConstPtr imgrgb_cur;
 float sigma_feature[2]={0,0}; //the uncertainty of feature in pixel frame
 int ifdetection = 0 ;
 Quaterniond q_bc = Quaterniond(-0.5, 0.5, -0.5, 0.5);
@@ -486,7 +497,8 @@ bool image_save = false;
 //visualization
 bool visualization = false;
 bool show_image = true;
-bool compare_rect = false;
+bool compare_rect = true;
+bool compare_upsampling = true;
 bool first_loop = false;
 bool time_compare = false;
 /******************************************/
@@ -501,7 +513,7 @@ void Preprocess(){
             if(i == 0 && j==0){
                 grid_param[index] = 10000;
             }else if(abs(i) == 1 && abs(j) ==1){
-                grid_param[index] = 10000;
+                grid_param[index] = 100;
             }else{
                 grid_param[index] = 1.0/sqrt(i*i+j*j);
             }
@@ -612,7 +624,9 @@ void Preprocess(){
                 
                 m_buf.unlock();
                 i_n ++;
-                ROS_DEBUG_STREAM("lock time = "<<lock_t.toc()<<" ms");        
+                ROS_DEBUG_STREAM("lock time = "<<lock_t.toc()<<" ms"); 
+                ave_lock = (ave_lock*(i_n-1) + lock_t.toc())/i_n;
+                ROS_DEBUG_STREAM("ave lock time: "<<ave_lock<<"ms");     
                 all_time.tic();
                 // ROS_INFO("pc received");
                 ROS_DEBUG_STREAM("sum_pc_i: "<<sum_pc_i);
@@ -626,18 +640,6 @@ void Preprocess(){
                 }
                 
 
-
-                // pc_manager.mask_win[cur_id].q_wb = q_drone_cur;
-                // pc_manager.mask_win[cur_id].t_wb = p_drone_cur;
-                // pc_manager.mask_win[cur_id].T_wb.block<3,3>(0,0) = q_drone_cur.toRotationMatrix();
-                // pc_manager.mask_win[cur_id].T_wb.block<3,1>(0,3) = p_drone_cur;
-                // pc_manager.mask_win[cur_id].T_bw.block<3,3>(0,0) = q_drone_cur.toRotationMatrix().transpose();
-                // pc_manager.mask_win[cur_id].T_bw.block<3,1>(0,3) = -1*pc_manager.mask_win[cur_id].T_bw.block<3,3>(0,0)*p_drone_cur;
-                
-                //  pc_manager.mask_win[pc_manager.current_id].ResetMaskSize(cloud.points.size());
-                // if(!pc_manager.init) continue;
-
-                //int grid = 5;
             
                 
                 
@@ -705,20 +707,19 @@ void Preprocess(){
                 
 
                 //omp_set_num_threads(4);
-                
-
-                Pc_Vector pc_vector;
-                pc_vector.timestamp = imgrgb_cur.header.stamp.toNSec();//这里不能用cur_timestamp，因为这里已经解锁了，所以这个变量可能已近更新了
-                pc_vector.q_wb = pc_manager.mask_win[cur_id].q_wb;
-                pc_vector.t_wb = pc_manager.mask_win[cur_id].t_wb;
+                int n_skip = 3;
+                Pc_Vector_Ptr pc_vector (new Pc_Vector());
+                pc_vector->timestamp = imgrgb_cur->header.stamp.toNSec();//这里不能用cur_timestamp，因为这里已经解锁了，所以这个变量可能已近更新了
+                pc_vector->q_wb = pc_manager.mask_win[cur_id].q_wb;
+                pc_vector->t_wb = pc_manager.mask_win[cur_id].t_wb;
                 int total_size = 0;
                 for(int i = 0; i<WINDOW_SIZE; i++){
                     total_size += pc_manager.pc_win_buffer[i]->points.size();
                 }
-                pc_vector.pc_lidar_3d.reserve(total_size/2+2);
-                pc_vector.pc_uv.reserve(total_size/2+2);
+                pc_vector->pc_lidar_3d.reserve(total_size/n_skip+2);
+                pc_vector->pc_uv.reserve(total_size/n_skip+2);
                 pc_manager.maskn.pc_masks_single.clear();
-                pc_manager.maskn.pc_masks_single.reserve(total_size/2+2);
+                pc_manager.maskn.pc_masks_single.reserve(total_size/n_skip+2);
                 if(time_compare){
 
                 
@@ -781,7 +782,7 @@ void Preprocess(){
 
 
                         #pragma omp parallel for//会导致每组数据的处理时间有一些不稳定性存在，但是整体时间上是缩短的，如果不用并行，全部处理的平均时间大概在100ms
-                        for (int i=0; i< pc_size; i=i+2){
+                        for (int i=0; i< pc_size; i=i+n_skip){
                             
                             Eigen::Vector3d pix_pc;
                             Eigen::Vector3d pc_lidar;
@@ -952,7 +953,7 @@ void Preprocess(){
 
 
                     // #pragma omp parallel for//会导致每组数据的处理时间有一些不稳定性存在，但是整体时间上是缩短的，如果不用并行，全部处理的平均时间大概在100ms
-                    for (int i=0; i< pc_size; i=i+2){
+                    for (int i=0; i< pc_size; i=i+n_skip){
                         
                         Eigen::Vector3d pix_pc;
                         Eigen::Vector3d pc_lidar;
@@ -1051,8 +1052,8 @@ void Preprocess(){
                             // }
                             m_thread.lock();
                             pc_manager.maskn.pc_masks_single.emplace_back(thispoint, grid);
-                            pc_vector.pc_lidar_3d.emplace_back(pc_lidar);
-                            pc_vector.pc_uv.emplace_back(pu, pv);
+                            pc_vector->pc_lidar_3d.emplace_back(pc_lidar);
+                            pc_vector->pc_uv.emplace_back(pu, pv);
                             // pc_vector.pc_3d_uv.emplace_back(pc_lidar.x(), pc_lidar.y(), pc_lidar.z(), pu, pv);
                             m_thread.unlock();    
                                     
@@ -1066,7 +1067,7 @@ void Preprocess(){
                 }
                 yolo_depth.push(pc_vector);
                 m_yolo_match.unlock();
-                pc_vector.pc_lidar_3d.clear();
+                // pc_vector->pc_lidar_3d.clear();
 
                 //ROS_INFO_STREAM("sizeof: "<<yolo_depth.back().pc_cam_3d.size());
                 //ROS_INFO_STREAM("num_outliner = "<<num_outliner);
@@ -1276,7 +1277,7 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
     // w_img = img.cols;
 	// h_img = img.rows;
 	// c_img = img.channels();
-    imgrgb = *msg;
+    imgrgb = msg;
     // time_img_last = time_img_cur;
     // time_img_cur = msg->header.stamp.toNSec();
     // if(time_img_cur <= time_img_last){
@@ -1289,7 +1290,7 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
     m_buf.lock();
     img_buffer.push(imgrgb); 
     int pc_buffer_size = pc_buffer.size();
-    cur_timestamp = imgrgb.header.stamp.toNSec();//yolo的时间戳是和图像一致的
+    cur_timestamp = imgrgb->header.stamp.toNSec();//yolo的时间戳是和图像一致的
     m_buf.unlock();
 
     //update feature point synchronized with pc timestamp
