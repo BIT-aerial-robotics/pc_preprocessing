@@ -875,6 +875,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   //ROS_INFO_STREAM("u(max, min) = "<<minmaxuv.umax<<", "<<minmaxuv.umin);
   cv::Mat image_upsample = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0)); //initialize the mat variable according to the size of image
   cv::Mat image_upsample_no_rect = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
+  cv::Mat image_upsample_original = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
   int size_3c = image_upsample.rows*image_upsample.cols*c;
   //TicToc allocate;
   // double* ima3d = (double*)malloc(sizeof(double)*(size_3c));
@@ -884,7 +885,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   // ROS_INFO_STREAM("id :"<<mask_id);
   //vector<make_pair<int, double>> ima3d;
   //vector<make_pair<int, double>> ima3d_;
-  vector<Mask_pc>& pc_masks_no_rect = pc_manager.mask_win[mask_id].pc_masks_single;
+  vector<Mask_pc>& pc_masks_no_rect = pc_manager.mask_no_rect.pc_masks_single;
   vector<Mask_pc>& pc_masks = pc_manager.maskn.pc_masks_single;
   int mask_size = pc_masks.size();
   // ROS_INFO_STREAM("mask size: "<< mask_size);
@@ -934,6 +935,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   /*through masks and save numerator and denominator in image-sized map */
   double* ima3d = pc_manager.maskn.ima3d;
   double* ima3d_ = pc_manager.maskn.ima3d_;
+  
   //#pragma omp parallel for 
   //ROS_INFO_STREAM("pc_manager.maskn.pc_masks_single"<<pc_masks[0].point.G_x);
   int col_c = image_upsample.cols*c;
@@ -1012,8 +1014,21 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   ROS_DEBUG_STREAM("mask calculate_i: "<<mask_method_i.toc()<<"ms");
   ave_mask_cal_i= (ave_mask_cal_i*(i_n-1) + mask_method_i.toc())/i_n;
   ROS_DEBUG_STREAM("ave mask calculate_i: "<<ave_mask_cal_i<<"ms");
+  //compare with original upsampling
+  int image_size = w*h*c;
+  double* ima3do = (double*)malloc(sizeof(double)*(image_size));
+  double* ima3do_ = (double*)malloc(sizeof(double)*(image_size));
+  if(compare_upsampling){
+    //set zero
+    for(int i = 0; i<image_size; i++){
+      *(ima3do + i) = 0;
+      *(ima3do_ + i) = 0;
+    }
+  }
+  //compare time cost of calculating pixel distance 
   if(time_compare){
     TicToc mask_method;//计算消耗主要在计算部分
+    
     for (int i_g = 0; i_g < mask_size; i_g ++){
     
       double Gr_x = pc_masks[i_g].point.Gr_x;
@@ -1026,29 +1041,6 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
 
       double pu = pc_masks[i_g].point.u_px;
       double pv = pc_masks[i_g].point.v_px;
-      // double dx = abs(pc_masks[i_g].point.x_3d);
-      // double dy = abs(pc_masks[i_g].point.y_3d);
-      // double dz = abs(pc_masks[i_g].point.z_3d);
-      // if(dy<0.01){
-      //   dy = 0.01;
-      //   //ROS_INFO_STREAM("dy = "<<dy);
-      // }
-      // if(dx<0.01){
-      //   dx = 0.01;
-      //   //ROS_INFO_STREAM("dy = "<<dy);
-      // }
-      // Gr_x = 1.0/sqrt(dx);
-      // Gr_y = 1.0/sqrt(dy);
-      // Gr_z = 1.0/sqrt(dz);
-      // G_x = sqrt(dx);
-      // G_y = sqrt(dy);
-      // G_z = sqrt(dz);
-      // // if(pc_masks[i_g].point.y_3d < 0){
-      // //   G_y = -G_y;
-      // // }
-      // // if(pc_masks[i_g].point.z_3d < 0){
-      // //   G_z = -G_z;
-      // // }
       double d2;
       for(int v = pc_masks[i_g].v_down; v<pc_masks[i_g].v_up; v++){
         for(int u =  pc_masks[i_g].u_down; u<pc_masks[i_g].u_up; u++){
@@ -1073,12 +1065,12 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
             pc_manager.maskn.malloc_ok = false;
             return 0;
           }
-          // ima3d[index] += x0;
-          // ima3d[index +1] += x1;
-          // ima3d[index +2] += x2;
-          // ima3d_[index] += y0;
-          // ima3d_[index +1] += y1;
-          // ima3d_[index +2] += y2;
+          ima3do[index] += x0;
+          ima3do[index +1] += x1;
+          ima3do[index +2] += x2;
+          ima3do_[index] += y0;
+          ima3do_[index +1] += y1;
+          ima3do_[index +2] += y2;
           // m_thread.unlock();
         }
       }
@@ -1089,36 +1081,36 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   }
   pc_masks.clear();
   if(compare_rect){
-    double* ima3d = pc_manager.mask_win[mask_id].ima3d;
-    double* ima3d_ = pc_manager.mask_win[mask_id].ima3d_;
+    double* ima3d = pc_manager.mask_no_rect.ima3d;
+    double* ima3d_ = pc_manager.mask_no_rect.ima3d_;
     int mask_size_no_rect = pc_masks_no_rect.size();
     // ROS_INFO_STREAM("mask size = "<<mask_size_no_rect);
     for (int i_g = 0; i_g < mask_size_no_rect; i_g ++){
-      double Gr_x=0, Gr_y=0, Gr_z=0, Gs=0;
-      double G_x = 0, G_y = 0, G_z=0;
+      double Gr_x = pc_masks_no_rect[i_g].point.Gr_x;
+      double Gr_y = pc_masks_no_rect[i_g].point.Gr_y;
+      double Gr_z = pc_masks_no_rect[i_g].point.Gr_z;
+      double Gs = 1;
+      double G_x = pc_masks_no_rect[i_g].point.G_x;
+      double G_y = pc_masks_no_rect[i_g].point.G_y;
+      double G_z = pc_masks_no_rect[i_g].point.G_z;
+
       double pu = pc_masks_no_rect[i_g].point.u_px;
       double pv = pc_masks_no_rect[i_g].point.v_px;
-      double dx = abs(pc_masks_no_rect[i_g].point.x_3d);
-      double dy = abs(pc_masks_no_rect[i_g].point.y_3d);
-      double dz = abs(pc_masks_no_rect[i_g].point.z_3d);
-
-      Gr_x = 1.0/sqrt(dx);
-      Gr_y = 1.0/sqrt(dy);
-      Gr_z = 1.0/sqrt(dz);
-      G_x = Gr_x*dx;
-      G_y = Gr_y*dy;
-      G_z = Gr_z*dz;
-      // if(pc_masks[i_g].point.y_3d < 0){
-      //   G_y = -G_y;
-      // }
-      // if(pc_masks[i_g].point.z_3d < 0){
-      //   G_z = -G_z;
-      // }
-      //ROS_INFO("what happened???");
-      for(int u =  pc_masks_no_rect[i_g].u_down; u<pc_masks_no_rect[i_g].u_up; u++){
-        for(int v = pc_masks_no_rect[i_g].v_down; v<pc_masks_no_rect[i_g].v_up; v++){
-          Gs = 1.0/sqrt((u - pu)*(u - pu) + (v-pv)*(v-pv));
-          int index = v*image_upsample.cols*c + u*c;
+      double d2;
+      int grid_index = 0;
+      for(int v = pc_masks_no_rect[i_g].v_down; v<pc_masks_no_rect[i_g].v_up; v++){
+        for(int u =  pc_masks_no_rect[i_g].u_down; u<pc_masks_no_rect[i_g].u_up; u++){
+          // d2 = sqrt((u - pu)*(u - pu) + (v-pv)*(v-pv));
+          // if(d2<0.0001){
+          //   //ROS_INFO_STREAM("d2 = "<<d2);
+          //   d2 = 0.0001;
+            
+          // }
+          // //ROS_INFO_STREAM("d2 = "<<d2);
+          // Gs = 1.0/d2;
+          Gs = grid_param[grid_index];
+          grid_index++;
+          int index = v*col_c + u*c;
           double x0 = Gs*Gr_x;
           double x1 = Gs*Gr_y;
           double x2 = Gs*Gr_z;
@@ -1126,13 +1118,18 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
           double y1 = Gs*G_y;
           double y2 = Gs*G_z;
           //m_thread.lock();
+          if(ima3d == NULL || ima3d_ == NULL){
+            ROS_ERROR("ima3d or ima3d_ pointer is NULL! restart!");
+            pc_manager.maskn.malloc_ok = false;
+            return 0;
+          }
           ima3d[index] += x0;
           ima3d[index +1] += x1;
           ima3d[index +2] += x2;
           ima3d_[index] += y0;
           ima3d_[index +1] += y1;
           ima3d_[index +2] += y2;
-          //m_thread.unlock();
+          // m_thread.unlock();
         }
       }
     }
@@ -1143,81 +1140,81 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   /*save the max denominator in all 4 serials data*/
   if(pc_manager.init){
     
-    if(compare_rect){
-      double* ima3d = pc_manager.mask_win[mask_id].ima3d;
-      double* ima3d_ = pc_manager.mask_win[mask_id].ima3d_;
+    // if(compare_rect){
+    //   double* ima3d = pc_manager.mask_no_rect.ima3d;
+    //   double* ima3d_ = pc_manager.mask_no_rect.ima3d_;
       
 
-      for(int vali = minrow; vali < maxrow; vali++){
-        for(int uali = (int)minmaxuv.umin; uali < (int)minmaxuv.umax; uali++){
-          unsigned char *row_ptr = image_upsample.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
-          unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
-          //notice the order is B,G,R in opencv, and R,G,B in matlab
-          int index = vali*image_upsample.cols*c + uali*c;
-          /*calculating denominator and set to 1 with 0 case*/
-          double denominator_x = 0;
-          double denominator_y = 0;
-          double denominator_z = 0;
-          for(int i = 0; i<WINDOW_SIZE; i++){
-            denominator_x += pc_manager.mask_win[i].ima3d[index];
-            denominator_y += pc_manager.mask_win[i].ima3d[index+1];
-            denominator_z += pc_manager.mask_win[i].ima3d[index+2];
-          }
-          if(denominator_x == 0) denominator_x = 1;
-          if(denominator_y == 0) denominator_y = 1;
-          if(denominator_z == 0) denominator_z = 1;
-          // if (ima3d[index]==0) {ima3d[index]=1;}
-          // if (ima3d[index+1]==0) {ima3d[index+1]=1;}
-          // if (ima3d[index+2]==0) {ima3d[index+2]=1;}
-          // Dx_i = ima3d_[index]/ima3d[index];
-          // Dy_i = ima3d_[index + 1]/ima3d[index + 1];
-          // Dz_i = ima3d_[index + 2]/ima3d[index + 2];
+    //   for(int vali = minrow; vali < maxrow; vali++){
+    //     for(int uali = (int)minmaxuv.umin; uali < (int)minmaxuv.umax; uali++){
+    //       unsigned char *row_ptr = image_upsample.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
+    //       unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
+    //       //notice the order is B,G,R in opencv, and R,G,B in matlab
+    //       int index = vali*image_upsample.cols*c + uali*c;
+    //       /*calculating denominator and set to 1 with 0 case*/
+    //       double denominator_x = 0;
+    //       double denominator_y = 0;
+    //       double denominator_z = 0;
+    //       for(int i = 0; i<WINDOW_SIZE; i++){
+    //         denominator_x += pc_manager.mask_win[i].ima3d[index];
+    //         denominator_y += pc_manager.mask_win[i].ima3d[index+1];
+    //         denominator_z += pc_manager.mask_win[i].ima3d[index+2];
+    //       }
+    //       if(denominator_x == 0) denominator_x = 1;
+    //       if(denominator_y == 0) denominator_y = 1;
+    //       if(denominator_z == 0) denominator_z = 1;
+    //       // if (ima3d[index]==0) {ima3d[index]=1;}
+    //       // if (ima3d[index+1]==0) {ima3d[index+1]=1;}
+    //       // if (ima3d[index+2]==0) {ima3d[index+2]=1;}
+    //       // Dx_i = ima3d_[index]/ima3d[index];
+    //       // Dy_i = ima3d_[index + 1]/ima3d[index + 1];
+    //       // Dz_i = ima3d_[index + 2]/ima3d[index + 2];
 
-          /*calculating depth map(befor normalized) and save the max one*/
-          double Dx_i = 0;//不赋值会有问题
-          double Dy_i = 0;
-          double Dz_i = 0;
-          for(int i = 0; i <WINDOW_SIZE; i++){
-            Dx_i += (pc_manager.mask_win[i].ima3d_[index])/denominator_x;
-            Dy_i += (pc_manager.mask_win[i].ima3d_[index+1])/denominator_y;
-            Dz_i += (pc_manager.mask_win[i].ima3d_[index+2])/denominator_z;
-          }
-          if(maxima3d_no_rect[0] < Dx_i ) (maxima3d_no_rect[0] = Dx_i); 
-          if(maxima3d_no_rect[1] < Dy_i ) (maxima3d_no_rect[1] = Dy_i) ;
-          if(maxima3d_no_rect[2] < Dz_i ) (maxima3d_no_rect[2] = Dz_i) ;
-        }
-      }
-      for(int vali = minrow; vali < maxrow; vali++)
-        for(int uali = (int)minmaxuv.umin; uali < (int)minmaxuv.umax; uali++){
-          unsigned char *row_ptr = image_upsample_no_rect.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
-          unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
-          //notice the order is B,G,R in opencv, and R,G,B in matlab
-          int index = vali*image_upsample.cols*c + uali*c;
+    //       /*calculating depth map(befor normalized) and save the max one*/
+    //       double Dx_i = 0;//不赋值会有问题
+    //       double Dy_i = 0;
+    //       double Dz_i = 0;
+    //       for(int i = 0; i <WINDOW_SIZE; i++){
+    //         Dx_i += (pc_manager.mask_win[i].ima3d_[index])/denominator_x;
+    //         Dy_i += (pc_manager.mask_win[i].ima3d_[index+1])/denominator_y;
+    //         Dz_i += (pc_manager.mask_win[i].ima3d_[index+2])/denominator_z;
+    //       }
+    //       if(maxima3d_no_rect[0] < Dx_i ) (maxima3d_no_rect[0] = Dx_i); 
+    //       if(maxima3d_no_rect[1] < Dy_i ) (maxima3d_no_rect[1] = Dy_i) ;
+    //       if(maxima3d_no_rect[2] < Dz_i ) (maxima3d_no_rect[2] = Dz_i) ;
+    //     }
+    //   }
+    //   for(int vali = minrow; vali < maxrow; vali++)
+    //     for(int uali = (int)minmaxuv.umin; uali < (int)minmaxuv.umax; uali++){
+    //       unsigned char *row_ptr = image_upsample_no_rect.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
+    //       unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
+    //       //notice the order is B,G,R in opencv, and R,G,B in matlab
+    //       int index = vali*image_upsample.cols*c + uali*c;
 
-          double denominator_x = 0;
-          double denominator_y = 0;
-          double denominator_z = 0;
-          for(int i = 0; i<WINDOW_SIZE; i++){
-            denominator_x += pc_manager.mask_win[i].ima3d[index];
-            denominator_y += pc_manager.mask_win[i].ima3d[index+1];
-            denominator_z += pc_manager.mask_win[i].ima3d[index+2];
-          }
-          // if(denominator_x == 0) denominator_x = 1;
-          // if(denominator_y == 0) denominator_y = 1;
-          // if(denominator_z == 0) denominator_z = 1;
-          double Dx_i = 0;//不赋值会有问题
-          double Dy_i = 0;
-          double Dz_i = 0;
-          for(int i = 0; i <WINDOW_SIZE; i++){
-            Dx_i += (pc_manager.mask_win[i].ima3d_[index]);
-            Dy_i += (pc_manager.mask_win[i].ima3d_[index+1]);
-            Dz_i += (pc_manager.mask_win[i].ima3d_[index+2]);
-          }
-          data_ptr[2] = (unsigned char)(255.0*( Dx_i/denominator_x/maxima3d_no_rect[0]));
-          data_ptr[0] = (unsigned char)(255.0*( Dy_i/denominator_y/maxima3d_no_rect[1]));
-          data_ptr[1] = (unsigned char)(255.0*( Dz_i/denominator_z/maxima3d_no_rect[2]));
-      }
-    }
+    //       double denominator_x = 0;
+    //       double denominator_y = 0;
+    //       double denominator_z = 0;
+    //       for(int i = 0; i<WINDOW_SIZE; i++){
+    //         denominator_x += pc_manager.mask_win[i].ima3d[index];
+    //         denominator_y += pc_manager.mask_win[i].ima3d[index+1];
+    //         denominator_z += pc_manager.mask_win[i].ima3d[index+2];
+    //       }
+    //       // if(denominator_x == 0) denominator_x = 1;
+    //       // if(denominator_y == 0) denominator_y = 1;
+    //       // if(denominator_z == 0) denominator_z = 1;
+    //       double Dx_i = 0;//不赋值会有问题
+    //       double Dy_i = 0;
+    //       double Dz_i = 0;
+    //       for(int i = 0; i <WINDOW_SIZE; i++){
+    //         Dx_i += (pc_manager.mask_win[i].ima3d_[index]);
+    //         Dy_i += (pc_manager.mask_win[i].ima3d_[index+1]);
+    //         Dz_i += (pc_manager.mask_win[i].ima3d_[index+2]);
+    //       }
+    //       data_ptr[2] = (unsigned char)(255.0*( Dx_i/denominator_x/maxima3d_no_rect[0]));
+    //       data_ptr[0] = (unsigned char)(255.0*( Dy_i/denominator_y/maxima3d_no_rect[1]));
+    //       data_ptr[1] = (unsigned char)(255.0*( Dz_i/denominator_z/maxima3d_no_rect[2]));
+    //   }
+    // }
     // double denominator_x = 0;
     //       double denominator_y = 0;
     //       double denominator_z = 0;
@@ -1284,11 +1281,23 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
         //notice the order is B,G,R in opencv, and R,G,B in matlab
         int index = vali*image_upsample.cols*c + uali*c;
-      //   data_ptr[2] = (unsigned char)(255.0*(ima3d_[index]/ima3d[index])/maxima3d[0]);
-      //  data_ptr[1] = (unsigned char)(255.0*(ima3d_[index + 1]/ima3d[index + 1])/maxima3d[1]);
-      //  data_ptr[0] = (unsigned char)(255.0*(ima3d_[index + 2]/ima3d[index + 2])/maxima3d[2]);
-      /*get the final nomalized depth map */
-      //2 1 0
+        //compare with the original upsampling algorithm
+        
+        if(compare_upsampling){
+          unsigned char *row_ptr_o = image_upsample_original.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
+          unsigned char *data_ptr_o = &row_ptr_o[uali * image_upsample_original.channels()]; 
+          data_ptr_o[2] = (unsigned char)(255.0*(( ima3do_[index])/(ima3do[index]))/ maxima3d[0]);
+          data_ptr_o[0] = (unsigned char)(255.0*(( ima3do_[index+1])/(ima3do[index+1]))/maxima3d[1]);
+          data_ptr_o[1] = (unsigned char)(255.0*(( ima3do_[index+2])/(ima3do[index+2]))/maxima3d[2]);
+        }
+        if(compare_rect){
+          unsigned char *row_ptr_no_rect = image_upsample_no_rect.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
+          unsigned char *data_ptr_no_rect = &row_ptr_no_rect[uali * image_upsample_original.channels()]; 
+          data_ptr_no_rect[2] = (unsigned char)(255.0*(( pc_manager.mask_no_rect.ima3d_[index])/(pc_manager.mask_no_rect.ima3d[index]))/ maxima3d[0]);
+          data_ptr_no_rect[0] = (unsigned char)(255.0*(( pc_manager.mask_no_rect.ima3d_[index+1])/(pc_manager.mask_no_rect.ima3d[index+1]))/maxima3d[1]);
+          data_ptr_no_rect[1] = (unsigned char)(255.0*(( pc_manager.mask_no_rect.ima3d_[index+2])/(pc_manager.mask_no_rect.ima3d[index+2]))/maxima3d[2]);
+        }
+
         data_ptr[2] = (unsigned char)(255.0*( (pc_manager.maskn.ima3d_[index])/(pc_manager.maskn.ima3d[index]))/ maxima3d[0]);
         data_ptr[0] = (unsigned char)(255.0*( (pc_manager.maskn.ima3d_[index+1])/(pc_manager.maskn.ima3d[index+1]))/maxima3d[1]);
         data_ptr[1] = (unsigned char)(255.0*( (pc_manager.maskn.ima3d_[index+2])/(pc_manager.maskn.ima3d[index+2]))/maxima3d[2]);
@@ -1328,7 +1337,9 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       cv::imshow("image_upsample_no_rect", image_upsample_no_rect);
       
     }
-
+    if(compare_upsampling){
+      cv::imshow("image_upsample_original_upsampling", image_upsample_original);
+    }
     
     if(image_save){
       double hz = 0;
@@ -1385,10 +1396,10 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     }
     // search_box_yolo
     // // if(ifdetection==1){
-      cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-      cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-      cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
-      cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      // cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+      // cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+      // cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      // cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
       // // ROS_INFO_STREAM("box_grid_points.size() = "<<box_grid_points.size());
       m_visualization.lock();
       // for(int i = 0;i < box_grid_points.size();i++){
@@ -1433,7 +1444,10 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     cur_setfre = 0;
     last_setfre = 0;
     ROS_INFO("Reset setfre value.");
+    
   }
+  free(ima3do);
+  free(ima3do_);
   return 0;
 }
 
@@ -1447,20 +1461,21 @@ bool compare_pc_v(const pointcoordinate& left,const pointcoordinate& right){
 
 void PC_Wrapper::UpdateMask(int id){
   current_id = id;
-  mask_win[id].mask_id = id;
-  mask_win[id].SetZeros();
+  // mask_win[id].mask_id = id;
+  // mask_win[id].SetZeros();
   maskn.SetZeros();
+  mask_no_rect.SetZeros();
 }
 
-void PC_Wrapper::UpdateMax3d(){
+// void PC_Wrapper::UpdateMax3d(){
   
-  for(int i = 0; i < WINDOW_SIZE; i++){
-    if(Maxima3d[0] < mask_win[i].maxima3d[0]) Maxima3d[0] = mask_win[i].maxima3d[0];
-    if(Maxima3d[1] < mask_win[i].maxima3d[1]) Maxima3d[1] = mask_win[i].maxima3d[1];
-    if(Maxima3d[2] < mask_win[i].maxima3d[2]) Maxima3d[2] = mask_win[i].maxima3d[2];
-  }
+//   for(int i = 0; i < WINDOW_SIZE; i++){
+//     if(Maxima3d[0] < mask_win[i].maxima3d[0]) Maxima3d[0] = mask_win[i].maxima3d[0];
+//     if(Maxima3d[1] < mask_win[i].maxima3d[1]) Maxima3d[1] = mask_win[i].maxima3d[1];
+//     if(Maxima3d[2] < mask_win[i].maxima3d[2]) Maxima3d[2] = mask_win[i].maxima3d[2];
+//   }
   
-}
+// }
 
 
 void ID_MASK::SetZeros(){

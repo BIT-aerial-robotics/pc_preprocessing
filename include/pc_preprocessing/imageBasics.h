@@ -221,12 +221,12 @@ struct ID_MASK{
     ~ID_MASK(){
         free(ima3d);
         free(ima3d_);
-        free(pc_masks);
+        // free(pc_masks);
         
     };
     // void ResetMaskSize(const int size);
     void SetZeros();
-    vector<Mask_pc> pc_masks[4];//多线程
+    // vector<Mask_pc> pc_masks[4];//多线程
     vector<Mask_pc> pc_masks_single;
     //Mask_pc* pc_masks;
     int masksize;
@@ -269,13 +269,16 @@ class PC_Wrapper{
 
 
 
-    ID_MASK mask_win[WINDOW_SIZE];//mask for no motion compensation
+    // ID_MASK mask_win[WINDOW_SIZE];//mask for no motion compensation
+    ID_MASK mask_no_rect;
     ID_MASK maskn;
     bool init;
     double Maxima3d[3];
     int current_id;
     double timestamp;//ns
     livox_ros_driver::CustomMsg::ConstPtr pc_win_buffer[WINDOW_SIZE];
+    Eigen::Quaterniond q_wb[WINDOW_SIZE];
+    Eigen::Vector3d t_wb[WINDOW_SIZE]; 
 };
 
 
@@ -500,12 +503,13 @@ bool show_image = true;
 bool compare_rect = true;
 bool compare_upsampling = true;
 bool first_loop = false;
-bool time_compare = false;
+bool time_compare = true;
 /******************************************/
 
 void Preprocess(){
     const int param_n = grid*grid*4;
     double grid_param[param_n];
+    // double 
     for(int j = -grid; j<grid; j++){
         for(int i = -grid; i<grid; i++){
             int index = (i+grid)+(j+grid)*grid*2;
@@ -546,7 +550,7 @@ void Preprocess(){
                 pc_time_cur = pc_manager.pc_win_buffer[sum_pc_i]->header.stamp.toSec();
                 //时间出现跳变，需要重置
                 if((pc_time_cur-pc_time_last>1.0 || pc_time_cur < pc_time_last) && pc_time_last != 0
-                        || !pc_manager.maskn.malloc_ok || !pc_manager.mask_win[sum_pc_i].malloc_ok){
+                        || !pc_manager.maskn.malloc_ok || !pc_manager.mask_no_rect.malloc_ok){
                     pc_manager.reset_init();
                     pc_first_call = true;
                     flag_int_xkk = 0;
@@ -584,8 +588,8 @@ void Preprocess(){
                
                 pc_manager.UpdateMask(sum_pc_i);
                 int cur_id = pc_manager.current_id;
-                pc_manager.mask_win[cur_id].q_wb = q_drone_cur;
-                pc_manager.mask_win[cur_id].t_wb = p_drone_cur;
+                pc_manager.q_wb[cur_id] = q_drone_cur;
+                pc_manager.t_wb[cur_id] = p_drone_cur;
                 pc_manager.timestamp = cur_timestamp;
                 pc_manager.maskn.timestamp = cur_timestamp;
                 /*update pose*/
@@ -595,7 +599,7 @@ void Preprocess(){
                 // ROS_INFO_STREAM("q_drone_buffer size = "<<q_drone_buffer.size());
                 while(!q_drone_buffer.empty()){         
                     if(i_buffer != cur_id){
-                        pc_manager.mask_win[i_buffer].q_wb = q_drone_buffer.front();;
+                        pc_manager.q_wb[i_buffer] = q_drone_buffer.front();;
                     }
                     // ROS_INFO_STREAM("ibuffer = "<<i_buffer);
                     i_buffer ++;
@@ -609,7 +613,7 @@ void Preprocess(){
                 i_buffer = 0;
                 while(!p_drone_buffer.empty()){        
                     if(i_buffer != cur_id){
-                        pc_manager.mask_win[i_buffer].t_wb = p_drone_buffer.front();;
+                        pc_manager.t_wb[i_buffer] = p_drone_buffer.front();;
                     }
                     i_buffer ++;
                     tmp_p_drone.push(p_drone_buffer.front());
@@ -710,8 +714,8 @@ void Preprocess(){
                 int n_skip = 3;
                 Pc_Vector_Ptr pc_vector (new Pc_Vector());
                 pc_vector->timestamp = imgrgb_cur->header.stamp.toNSec();//这里不能用cur_timestamp，因为这里已经解锁了，所以这个变量可能已近更新了
-                pc_vector->q_wb = pc_manager.mask_win[cur_id].q_wb;
-                pc_vector->t_wb = pc_manager.mask_win[cur_id].t_wb;
+                pc_vector->q_wb = pc_manager.q_wb[cur_id];
+                pc_vector->t_wb = pc_manager.t_wb[cur_id];
                 int total_size = 0;
                 for(int i = 0; i<WINDOW_SIZE; i++){
                     total_size += pc_manager.pc_win_buffer[i]->points.size();
@@ -720,16 +724,13 @@ void Preprocess(){
                 pc_vector->pc_uv.reserve(total_size/n_skip+2);
                 pc_manager.maskn.pc_masks_single.clear();
                 pc_manager.maskn.pc_masks_single.reserve(total_size/n_skip+2);
+                //compare time consumer of pc_vector insert
                 if(time_compare){
-
-                
                     TicToc start_i;
                     //#pragma omp parallel for
                     for(int k =0; k<WINDOW_SIZE; k++){
                     
                         int pc_size = pc_manager.pc_win_buffer[k]->points.size();
-                        double* ima3d = pc_manager.mask_win[k].ima3d;
-                        double* ima3d_ = pc_manager.mask_win[k].ima3d_;
                         livox_ros_driver::CustomMsg::ConstPtr pc_msg = pc_manager.pc_win_buffer[k];
                         /*********************************************************************************/
                         //pcl
@@ -752,8 +753,8 @@ void Preprocess(){
 
                         //sort(pc_msg.points.begin(), pc_msg.points.end(), comp);
                         //Matrix4d T_cam0_L1 =  pc_manager.mask_win[pc_manager.current_id].T_bw * pc_manager.mask_win[pc_manager.current_id].T_wb * T_imu_lidar;
-                        Quaterniond q_b0_b1 = pc_manager.mask_win[cur_id].q_wb.inverse()*pc_manager.mask_win[k].q_wb;
-                        Vector3d t_b0_b1 = pc_manager.mask_win[cur_id].q_wb.inverse()*(pc_manager.mask_win[k].t_wb-pc_manager.mask_win[cur_id].t_wb);
+                        Quaterniond q_b0_b1 = pc_manager.q_wb[cur_id].inverse()*pc_manager.q_wb[k];
+                        Vector3d t_b0_b1 = pc_manager.q_wb[cur_id].inverse()*(pc_manager.t_wb[k]-pc_manager.t_wb[cur_id]);
                         // ROS_INFO_STREAM("relative p = ("<<t_b0_b1.x()<<", "<<t_b0_b1.y()<<", "<<t_b0_b1.z()<<")");
                         // ROS_INFO_STREAM("relative q = \n"<<q_b0_b1.toRotationMatrix().matrix());
                         Matrix3d R_b0_lidar = q_b0_b1*R_imu_lidar;
@@ -899,8 +900,6 @@ void Preprocess(){
                 for(int k =0; k<WINDOW_SIZE; k++){
                 
                     int pc_size = pc_manager.pc_win_buffer[k]->points.size();
-                    double* ima3d = pc_manager.mask_win[k].ima3d;
-                    double* ima3d_ = pc_manager.mask_win[k].ima3d_;
                     livox_ros_driver::CustomMsg::ConstPtr pc_msg = pc_manager.pc_win_buffer[k];
                     /*********************************************************************************/
                     //pcl
@@ -923,8 +922,8 @@ void Preprocess(){
 
                     //sort(pc_msg.points.begin(), pc_msg.points.end(), comp);
                     //Matrix4d T_cam0_L1 =  pc_manager.mask_win[pc_manager.current_id].T_bw * pc_manager.mask_win[pc_manager.current_id].T_wb * T_imu_lidar;
-                    Quaterniond q_b0_b1 = pc_manager.mask_win[cur_id].q_wb.inverse()*pc_manager.mask_win[k].q_wb;
-                    Vector3d t_b0_b1 = pc_manager.mask_win[cur_id].q_wb.inverse()*(pc_manager.mask_win[k].t_wb-pc_manager.mask_win[cur_id].t_wb);
+                    Quaterniond q_b0_b1 = pc_manager.q_wb[cur_id].inverse()*pc_manager.q_wb[k];
+                    Vector3d t_b0_b1 = pc_manager.q_wb[cur_id].inverse()*(pc_manager.t_wb[k]-pc_manager.t_wb[cur_id]);
                     // ROS_INFO_STREAM("relative p = ("<<t_b0_b1.x()<<", "<<t_b0_b1.y()<<", "<<t_b0_b1.z()<<")");
                     // ROS_INFO_STREAM("relative q = \n"<<q_b0_b1.toRotationMatrix().matrix());
                     Matrix3d R_b0_lidar = q_b0_b1*R_imu_lidar;
@@ -1083,72 +1082,99 @@ void Preprocess(){
                 
                 if(compare_rect){
                     
-                    int pc_size = pc_manager.pc_win_buffer[cur_id]->points.size();
-                    // ROS_DEBUG_STREAM("no_rect point size = "<<pc_size);
-                    livox_ros_driver::CustomMsg::ConstPtr pc_msg = pc_manager.pc_win_buffer[cur_id];
-                    //#pragma omp parallel for
-                    for (int i=0; i< pc_size; i=i+2){
-                        // if(!first_loop){
-                        //     first_loop = true;
-                        //     ROS_INFO("break!!!");
-                        //     break;
-                        // }
-                        Eigen::Vector3d pix_pc;
-                        Eigen::Vector3d pc_i;
-                        //if(i%2 == 0) continue;
-                        pc_i<< pc_msg->points[i].x, pc_msg->points[i].y, pc_msg->points[i].z;
-                        if(pc_i.x()<1 && pc_i.y()<1 && pc_i.z()<1){
-                            
-                            pickout_n ++;
-                            continue;
-                        }
-                        if(pc_i.x()>x_threshold || (pc_i.y()>y_threshold || pc_i.y()<-y_threshold) || (pc_i.z()>z_threshold || pc_i.z()<-z_threshold)){
-                            pickout_n_100 ++;
-                            continue;
-                        }
-                        valid_num++;
+                    #pragma omp parallel for
+                    for(int k =0; k<WINDOW_SIZE; k++){
                     
+                        int pc_size = pc_manager.pc_win_buffer[k]->points.size();
+                        livox_ros_driver::CustomMsg::ConstPtr pc_msg = pc_manager.pc_win_buffer[k];
                         
-                        //pc_cam = R_lidar0_lidar*pc_i + t_lidar0_lidar;
+                        Quaterniond q_b0_b1 = pc_manager.q_wb[cur_id].inverse()*pc_manager.q_wb[k];
+                        Vector3d t_b0_b1 = pc_manager.q_wb[cur_id].inverse()*(pc_manager.t_wb[k]-pc_manager.t_wb[cur_id]);
+                        // ROS_INFO_STREAM("relative p = ("<<t_b0_b1.x()<<", "<<t_b0_b1.y()<<", "<<t_b0_b1.z()<<")");
+                        // ROS_INFO_STREAM("relative q = \n"<<q_b0_b1.toRotationMatrix().matrix());
+                        Matrix3d R_b0_lidar = q_b0_b1*R_imu_lidar;
+                        // Vector3d t_b0_lidar = pc_manager.mask_win[cur_id].q_wb.inverse()*(pc_manager.mask_win[k].q_wb*t_imu_lidar) + t_b0_b1;
+                        Vector3d t_b0_lidar = q_b0_b1*t_imu_lidar + t_b0_b1;
+
+                        Matrix3d R_lidar0_lidar = R_imu_lidar.inverse()*R_b0_lidar;
+                        Vector3d t_lidar0_lidar = R_imu_lidar.inverse()*(t_b0_lidar)-R_imu_lidar.inverse()*t_imu_lidar;
+                        Matrix3d R_cam0_lidar = R_cam_imu*R_b0_lidar;
+                        Vector3d t_cam0_lidar = (R_cam_imu*(t_b0_lidar)+t_cam_imu);
+                        Matrix3d R_uv0_lidar = K_in*R_cam0_lidar;
+                        Vector3d t_uv0_lidar = K_in*t_cam0_lidar;
+                        Vector3d cam_offset = Vector3d(0,0,0);
+
+
+
+
+                        // #pragma omp parallel for//会导致每组数据的处理时间有一些不稳定性存在，但是整体时间上是缩短的，如果不用并行，全部处理的平均时间大概在100ms
+                        for (int i=0; i< pc_size; i=i+n_skip){
+                            
+                            Eigen::Vector3d pix_pc;
+                            Eigen::Vector3d pc_lidar;
+                            Eigen::Vector3d pc_i;
+                            //if(i%2 == 0) continue;//如果不筛一半，不并行的话，处理时间大概在180ms
+                            // pc_i<< cloud_filtered-> , pc_msg->points[i].y, pc_msg->points[i].z;
+                            pc_i<< pc_msg->points[i].x, pc_msg->points[i].y, pc_msg->points[i].z;
+                            // ROS_INFO_STREAM("time: "<<pc_msg->points[i].offset_time);
+                            // ROS_INFO_STREAM("pc_i.x = "<<pc_i.x());
+                            //如果没有，会导致上采样后的图像出现一些黑点
+                            if(pc_i.x()<1 && pc_i.y()<1 && pc_i.z()<1){
+                                
+                                pickout_n ++;
+                                continue;
+                            }
+                            if(pc_i.x()>x_threshold || (pc_i.y()>y_threshold || pc_i.y()<-y_threshold) || (pc_i.z()>z_threshold || pc_i.z()<-z_threshold)){
+                                pickout_n_100 ++;
+                                continue;
+                            }
+                            valid_num++;
                         
-                        pix_pc = T_pc_ima.block<3,3>(0,0)*pc_i + T_pc_ima.block<3,1>(0,3);
-                        // pc_cam = T_cam_lidar*pc_i;
-                        pix_pc[0] = pix_pc[0]/pix_pc[2];
-                        pix_pc[1] = pix_pc[1]/pix_pc[2];
-                        pointcoordinate thispoint;
-                        pointcoordinate thispoint_no_rect;
-                        //check pix in the camera feild of view
-                        if(  pix_pc[0] >= 1  && (int)pix_pc[0] <= w_img-1 &&  pix_pc[1] >= 1  && (int)pix_pc[1] < h_img -1){
-                            //num_outliner++;
-                            thispoint.x_3d = pc_i.x();
-                            thispoint.y_3d = pc_i.y();
-                            thispoint.z_3d = pc_i.z();
-                            thispoint.u_px = pix_pc[0];
-                            thispoint.v_px = pix_pc[1];
-                            thispoint.t_offset = pc_msg->points[i].offset_time;
-                            //thispoints[i]=thispoint;
-                            //pc_array.push_back(thispoint);
+                            
+                            //pc_cam = R_lidar0_lidar*pc_i + t_lidar0_lidar;
+                            // pc_cam = R_cam0_lidar*pc_i + t_cam0_lidar + cam_offset;
+                            // pc_lidar = R_lidar0_lidar*pc_i + t_lidar0_lidar;
+                            pc_lidar = pc_i;
+                            //pix_pc = T_pc_ima.block<3,3>(0,0)*pc_i + T_pc_ima.block<3,1>(0,3);
+                            pix_pc = T_pc_ima.block<3,3>(0,0)*pc_i + T_pc_ima.block<3,1>(0,3);
+                            // pix_pc = R_uv0_lidar*pc_i + t_uv0_lidar;
+                            // pc_cam = T_cam_lidar*pc_i;
+                            pix_pc[0] = pix_pc[0]/pix_pc[2];
+                            pix_pc[1] = pix_pc[1]/pix_pc[2];
+                            pointcoordinate thispoint;
+                            //check pix in the camera feild of view
+                            if(  pix_pc[0] >= 1  && (int)pix_pc[0] <= w_img-1 &&  pix_pc[1] >= 1  && (int)pix_pc[1] < h_img -1){
+                                //num_outliner++;
+                                // thispoint.x_3d = pc_i.x();
+                                // thispoint.y_3d = pc_i.y();
+                                // thispoint.z_3d = pc_i.z();
+                                thispoint.x_3d = pc_lidar.x();
+                                thispoint.y_3d = pc_lidar.y();
+                                thispoint.z_3d = pc_lidar.z();
+                                thispoint.u_px = pix_pc[0];
+                                thispoint.v_px = pix_pc[1];
+                                thispoint.t_offset = pc_msg->points[i].offset_time;
 
-                            // if  (thispoint.x_3d > point_max.x) { point_max.x = thispoint.x_3d; }
-                            // if  (thispoint.y_3d > point_max.y) { point_max.y = thispoint.y_3d; }
-                            // if  (thispoint.z_3d > point_max.z) { point_max.z = thispoint.z_3d; }
-                            // if  (thispoint.x_3d < point_min.x) { point_min.x = thispoint.x_3d; }
-                            // if  (thispoint.y_3d < point_min.y) { point_min.y = thispoint.y_3d; }
-                            // if  (thispoint.z_3d < point_min.z) { point_min.z = thispoint.z_3d; }
-
-                            // if  (thispoint.u_px > minmaxuv.umax) {minmaxuv.umax = thispoint.u_px;}
-                            // if  (thispoint.u_px < minmaxuv.umin) {minmaxuv.umin = thispoint.u_px; }
-                            // if  (thispoint.v_px > minmaxuv.vmax) {minmaxuv.vmax = thispoint.v_px;}
-                            // if  (thispoint.v_px < minmaxuv.vmin) {minmaxuv.vmin = thispoint.v_px;}
-                            // for (int u = max( (int)(pix_pc[0]- grid), 0); u < min ( (int)(pix_pc[0] + grid), w_img); u++)
-                            //  for (int v = max( (int)( pix_pc[1]- grid), 0);  v < min ( (int)(pix_pc[1] + grid), h_img); v++){
-                            //       pc_array_grid[v*w_img+u].push_back(thispoint);           
-                            //  }
-                            //save mask
-                            m_thread.lock();
-                            pc_manager.mask_win[cur_id].pc_masks_single.emplace_back(thispoint, grid);
-                            m_thread.unlock();    
-                                    
+                                
+                                double pu = pix_pc[0];
+                                double pv = pix_pc[1];
+                                double dx = abs(pc_lidar.x());
+                                double dy = abs(pc_lidar.y());
+                                double dz = abs(pc_lidar.z());
+                                
+                                thispoint.Gr_x = 1.0/sqrt(dx);
+                                thispoint.Gr_y = 1.0/sqrt(dy);
+                                thispoint.Gr_z = 1.0/sqrt(dz);
+                                thispoint.G_x = sqrt(dx);
+                                thispoint.G_y = sqrt(dy);
+                                thispoint.G_z = sqrt(dz);
+                               
+                                m_thread.lock();
+                                pc_manager.mask_no_rect.pc_masks_single.emplace_back(thispoint, grid);
+                               
+                                m_thread.unlock();    
+                                        
+                            }
                         }
                     }
                 }

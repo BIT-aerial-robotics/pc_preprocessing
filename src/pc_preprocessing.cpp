@@ -125,48 +125,48 @@ void DBSCAN(vector<point> &dataset, float Eps, int MinPts)
 
 
 
-void* multi_thread_preprocess(void* threadsstruct){
-     Threadsstruct* manager  = (Threadsstruct*)(threadsstruct);
-     int thread_id = manager->thread_id;
-     //int num_outliner = 0;
-     int start_index = manager->start_index;
-     int end_index = manager->end_index;
-     int cur_id = pc_manager.current_id;
-     //vector<Eigen::Vector4d>& Pc_vector = manager->pc_vector;
-     Eigen::Vector4d pc_i;
-     Eigen::VectorXd pix_pc(4);
-     for (int i=start_index; i< end_index; i++){
-          pc_i<< cloud.points[i].x, cloud.points[i].y, cloud.points[i].z, 1;
-          pix_pc = T_pc_ima*pc_i;
+// void* multi_thread_preprocess(void* threadsstruct){
+//      Threadsstruct* manager  = (Threadsstruct*)(threadsstruct);
+//      int thread_id = manager->thread_id;
+//      //int num_outliner = 0;
+//      int start_index = manager->start_index;
+//      int end_index = manager->end_index;
+//      int cur_id = pc_manager.current_id;
+//      //vector<Eigen::Vector4d>& Pc_vector = manager->pc_vector;
+//      Eigen::Vector4d pc_i;
+//      Eigen::VectorXd pix_pc(4);
+//      for (int i=start_index; i< end_index; i++){
+//           pc_i<< cloud.points[i].x, cloud.points[i].y, cloud.points[i].z, 1;
+//           pix_pc = T_pc_ima*pc_i;
           
-          pix_pc[0] = pix_pc[0]/pix_pc[2];
-          pix_pc[1] = pix_pc[1]/pix_pc[2];
+//           pix_pc[0] = pix_pc[0]/pix_pc[2];
+//           pix_pc[1] = pix_pc[1]/pix_pc[2];
 
-      	pointcoordinate thispoint;
-          //check pix in the camera feild of view
-          if(  pix_pc[0] >= 1  && (int)pix_pc[0] <= w_img-1 &&  pix_pc[1] >= 1  && (int)pix_pc[1] < h_img -1){
-               //num_outliner++;
-               thispoint.x_3d = pc_i.x();
-          	thispoint.y_3d = pc_i.y();
-          	thispoint.z_3d = pc_i.z();
-          	thispoint.u_px = pix_pc[0];
-          	thispoint.v_px = pix_pc[1];
+//       	pointcoordinate thispoint;
+//           //check pix in the camera feild of view
+//           if(  pix_pc[0] >= 1  && (int)pix_pc[0] <= w_img-1 &&  pix_pc[1] >= 1  && (int)pix_pc[1] < h_img -1){
+//                //num_outliner++;
+//                thispoint.x_3d = pc_i.x();
+//           	thispoint.y_3d = pc_i.y();
+//           	thispoint.z_3d = pc_i.z();
+//           	thispoint.u_px = pix_pc[0];
+//           	thispoint.v_px = pix_pc[1];
           
 
-               if  (thispoint.u_px > manager->minmaxuv_thread.umax) {manager->minmaxuv_thread.umax = thispoint.u_px;}
-               if  (thispoint.u_px < manager->minmaxuv_thread.umin) {manager->minmaxuv_thread.umin = thispoint.u_px;}
-               if  (thispoint.v_px > manager->minmaxuv_thread.vmax) {manager->minmaxuv_thread.vmax = thispoint.v_px;}
-               if  (thispoint.v_px < manager->minmaxuv_thread.vmin) {manager->minmaxuv_thread.vmin = thispoint.v_px;}
+//                if  (thispoint.u_px > manager->minmaxuv_thread.umax) {manager->minmaxuv_thread.umax = thispoint.u_px;}
+//                if  (thispoint.u_px < manager->minmaxuv_thread.umin) {manager->minmaxuv_thread.umin = thispoint.u_px;}
+//                if  (thispoint.v_px > manager->minmaxuv_thread.vmax) {manager->minmaxuv_thread.vmax = thispoint.v_px;}
+//                if  (thispoint.v_px < manager->minmaxuv_thread.vmin) {manager->minmaxuv_thread.vmin = thispoint.v_px;}
 
-               //int test = max(2, 4);
-               //full 10x10 grid
-               //manager->pc_mask_thread.emplace_back(thispoint, grid);
-               //这样会有问题吗？
-               pc_manager.mask_win[cur_id].pc_masks[thread_id].emplace_back(thispoint, grid);
-          }
-     }
-     return threadsstruct;
-}
+//                //int test = max(2, 4);
+//                //full 10x10 grid
+//                //manager->pc_mask_thread.emplace_back(thispoint, grid);
+//                //这样会有问题吗？
+//                pc_manager.mask_win[cur_id].pc_masks[thread_id].emplace_back(thispoint, grid);
+//           }
+//      }
+//      return threadsstruct;
+// }
 
 
 void poseCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg)
