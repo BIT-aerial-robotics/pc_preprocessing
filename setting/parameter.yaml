@@ -1,0 +1,17 @@
+%YAML:1.0
+
+grid: 5
+#generate distance list for up-sampling
+n_split: 100 #split [0,1) into n_split part
+
+
+image_save: 0
+visualization: 0
+show_image: 1
+compare_rect: 0
+compare_upsampling: 0
+first_loop: 0
+time_compare: 0
+
+
+

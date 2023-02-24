@@ -49,6 +49,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
 
 #include <mutex>
 #include <thread>
@@ -96,10 +97,28 @@ double cx = 343.760000000000;
 double cy = 183.879500000000; 
 
 
+int grid = 5;
+int n_split = 5;
+double m_split = 1.0/n_split;
+int param_n = (grid*2+1)*(grid*2+1);
+int list_num = n_split*n_split;
+vector<double> k_value;
 
 
-
-
+template<typename T>
+T readParam(ros::NodeHandle &n, string name){
+    T ans;
+    //使用getParam函数读取launch里的参数
+    if(n.getParam(name, ans))
+    {
+        ROS_INFO_STREAM("Loaded "<<name<<": "<<ans);
+    }
+    else{
+        ROS_ERROR_STREAM("Failed to load "<<name);
+        n.shutdown();
+    }
+    return ans;
+}
 
 
 enum ESampleType
@@ -256,6 +275,7 @@ class PC_Wrapper{
         Maxima3d[2] = 0;
         current_id = 0;
     }
+   
     void UpdateMask(int id);
     void set_init(){init = true;};
     void reset_init(){
@@ -279,6 +299,7 @@ class PC_Wrapper{
     livox_ros_driver::CustomMsg::ConstPtr pc_win_buffer[WINDOW_SIZE];
     Eigen::Quaterniond q_wb[WINDOW_SIZE];
     Eigen::Vector3d t_wb[WINDOW_SIZE]; 
+    vector<vector<double>> grid_param;
 };
 
 
@@ -298,7 +319,7 @@ struct Threadsstruct{
 };
 
 bool compare_pc_v(const pointcoordinate& left,const pointcoordinate& right);
-int upsampling_pro(pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int nof, double grid_param[]);
+int upsampling_pro(pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int nof);
 void* multi_thread_preprocess(void* threadsstruct);
 extern ros::Publisher pubimg;
 
@@ -410,7 +431,7 @@ vector<pointcoordinate> pc_array;
 //vector<pointcoordinate> pc_array_grid[921600];
 //vector<pointcoordinate> pc_array_grid[252672];
 //vector<Mask_pc> pc_masks;
-PC_Wrapper pc_manager;
+
 TicToc all_time;
 const int thread_num = 4;
 //unordered_map<int, std::vector<pointcoordinate>> pc_array_grid;
@@ -485,7 +506,7 @@ int ifdetection = 0 ;
 Quaterniond q_bc = Quaterniond(-0.5, 0.5, -0.5, 0.5);
 Vector3d t_bc = Vector3d::Zero();
 
-int grid = 5;
+
 Eigen::VectorXd pc_i(4);
 Eigen::MatrixXd T_pc_ima(4,4);
 Eigen::MatrixXd T_cam_lidar(4,4);
@@ -496,35 +517,51 @@ double y_threshold = 20;
 double z_threshold = 20;
 
 //save image for train
-bool image_save = false;
+int image_save;
 //visualization
-bool visualization = false;
-bool show_image = true;
-bool compare_rect = true;
-bool compare_upsampling = true;
-bool first_loop = false;
-bool time_compare = true;
+int visualization;
+int show_image;
+int compare_rect;
+int compare_upsampling;
+int first_loop;
+int time_compare;
+
 /******************************************/
-
+PC_Wrapper pc_manager;
 void Preprocess(){
-    const int param_n = grid*grid*4;
-    double grid_param[param_n];
-    // double 
-    for(int j = -grid; j<grid; j++){
-        for(int i = -grid; i<grid; i++){
-            int index = (i+grid)+(j+grid)*grid*2;
-
-            if(i == 0 && j==0){
-                grid_param[index] = 10000;
-            }else if(abs(i) == 1 && abs(j) ==1){
-                grid_param[index] = 100;
-            }else{
-                grid_param[index] = 1.0/sqrt(i*i+j*j);
-            }
-            // cout<<grid_param[index]<<"  ";
-        }
-        // cout<<endl;
+   
+    for(int i = 0; i<n_split; i++){
+        k_value.emplace_back(i*m_split);//[0,1)
     }
+    // double grid_param[list_num][param_n];
+    // vector<vector<double>> grid_param;
+    // double 
+    for(int index_v = 0; index_v < n_split; index_v++){
+        for(int index_u = 0; index_u < n_split; index_u++){
+            int index_list = index_v*n_split + index_u;
+            // ROS_INFO_STREAM("index_list = "<<index_list);
+            double k_u = k_value[index_u];
+            double k_v = k_value[index_v];
+            vector<double> d_map;
+            for(int j = -grid; j<=grid; j++){
+                for(int i = -grid; i<=grid; i++){
+                    int index = (i+grid)+(j+grid)*grid*2;
+                    // ROS_INFO_STREAM("index = "<<index);
+                    double d2 = (j-k_v)*(j-k_v) + (i-k_u)*(i-k_u);
+                    if(d2 == 0){
+                        d_map.emplace_back(10000);
+                    }else{
+                        d_map.emplace_back(1.0/sqrt(d2));
+                    }
+                    // cout<<grid_param[index_list][index]<<"  ";
+                }
+                // cout<<endl;
+            }
+            pc_manager.grid_param.emplace_back(d_map);
+            // cout<<endl;
+        }
+    }
+    ROS_INFO("Prepreocess Thread Initialized!!!");
     while(true){
             try{
                 std::unique_lock<std::mutex> lk(m_buf);
@@ -1183,7 +1220,7 @@ void Preprocess(){
                 //cout << "array size: " << pc_array.size() << endl;
                 //ROS_INFO_STREAM("point_max.x :"<<point_max.x);
                 //compare_rect = true;
-                int ups = upsampling_pro(point_max, point_min, minmaxuv, w_img, h_img, c_img, i_pc_count, grid_param);
+                int ups = upsampling_pro(point_max, point_min, minmaxuv, w_img, h_img, c_img, i_pc_count);
                 //  i_pc_count ++;
                 //pc_size = 0;
                 

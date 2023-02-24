@@ -290,8 +290,8 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
      darknet_ros_msgs::BoundingBoxes boundingBoxesResults_ = *msg;
      int boxno = boundingBoxesResults_.bounding_boxes.size();
      long long cur_yolo_timestamp = msg->header.stamp.toNSec();
-     // ROS_INFO_STREAM("timestamp = "<<cur_yolo_timestamp);
-     // ROS_INFO_STREAM("timestamp_last = "<<last_yolo_timestamp);
+     ROS_INFO_STREAM("timestamp = "<<cur_yolo_timestamp);
+     ROS_INFO_STREAM("timestamp_last = "<<last_yolo_timestamp);
      Pc_Vector yolo_cur_pc_data;
      if(boxno == 0){
           ROS_ERROR("nox = 0 !!!!!");
@@ -938,6 +938,35 @@ int main(int argc, char **argv)
      T_cam_lidar.block<3,3>(0,0) = R_cam_lidar;
      T_cam_lidar.block<3,1>(0,3) = t_cam_lidar;
      
+     
+	//read parameters form yalm file
+	string setting_file;
+	setting_file = readParam<string>(n, "setting");
+	ROS_INFO_STREAM("setting path = "<<setting_file);
+	cv::FileStorage fsSettings(setting_file.c_str(), cv::FileStorage::READ);
+	
+	fsSettings["grid"]>>grid;
+     ROS_INFO_STREAM("kernel size: "<<grid);
+	fsSettings["n_split"]>>n_split;
+     ROS_INFO_STREAM("n_split: "<<n_split);
+     m_split = 1.0/n_split;
+     param_n = (grid*2+1)*(grid*2+1);
+     list_num = n_split*n_split;
+	//save image for train
+     fsSettings["image_save"]>>image_save;
+     ROS_INFO_STREAM("image_save: "<<image_save);
+     //visualization
+     fsSettings["visualization"]>>visualization;
+     ROS_INFO_STREAM("visualization: "<<visualization);
+     fsSettings["show_image"]>>show_image;
+     ROS_INFO_STREAM("show_image: "<<show_image);
+     fsSettings["compare_rect"]>>compare_rect;
+     ROS_INFO_STREAM("compare_rect: "<<compare_rect);
+     fsSettings["compare_rect"]>>compare_upsampling;
+     ROS_INFO_STREAM("compare_rect: "<<compare_upsampling);
+     fsSettings["time_compare"]>>time_compare;
+     ROS_INFO_STREAM("time_compare: "<<time_compare);
+ 
 
      std::thread prepro_pc = std::thread(&Preprocess);
      std::thread yolo_update = std::thread(&Yolo_Update);

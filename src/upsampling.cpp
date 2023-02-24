@@ -864,7 +864,7 @@ void PC_EKF_uodate(Vector3d measurements){
 
 
 //单线程处理
-int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int nof, double grid_param[]) {
+int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &minmaxuv, int w, int h, int c, int nof) {
 	// Use std::chrono to time the algorithm
   double S_x=0, S_y=0, S_z=0, Y_x=0, Y_y=0, Y_z=0;
   //double mr_x=maxxyz.x, mr_y=maxxyz.y, mr_z=maxxyz.z;
@@ -976,6 +976,8 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     // // }
     double d2;
     int grid_index = 0;
+    int list_index = int((pu-int(pu))/m_split) + int((pv-int(pv))/m_split)*n_split;
+    vector<double>& grid_map = pc_manager.grid_param[list_index]; 
     for(int v = pc_masks[i_g].v_down; v<pc_masks[i_g].v_up; v++){
       for(int u =  pc_masks[i_g].u_down; u<pc_masks[i_g].u_up; u++){
         // d2 = sqrt((u - pu)*(u - pu) + (v-pv)*(v-pv));
@@ -986,7 +988,9 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         // }
         // //ROS_INFO_STREAM("d2 = "<<d2);
         // Gs = 1.0/d2;
-        Gs = grid_param[grid_index];
+        
+        
+        Gs = grid_map[grid_index];
         grid_index++;
         int index = v*col_c + u*c;
         double x0 = Gs*Gr_x;
@@ -1011,9 +1015,9 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       }
     }
   }
-  ROS_DEBUG_STREAM("mask calculate_i: "<<mask_method_i.toc()<<"ms");
+  ROS_DEBUG_STREAM("mask calculate_grid: "<<mask_method_i.toc()<<"ms");
   ave_mask_cal_i= (ave_mask_cal_i*(i_n-1) + mask_method_i.toc())/i_n;
-  ROS_DEBUG_STREAM("ave mask calculate_i: "<<ave_mask_cal_i<<"ms");
+  ROS_DEBUG_STREAM("ave mask calculate_grid: "<<ave_mask_cal_i<<"ms");
   //compare with original upsampling
   int image_size = w*h*c;
   double* ima3do = (double*)malloc(sizeof(double)*(image_size));
@@ -1075,9 +1079,9 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         }
       }
     }
-    ROS_DEBUG_STREAM("mask calculate: "<<mask_method.toc()<<"ms");
+    ROS_DEBUG_STREAM("mask calculate_original: "<<mask_method.toc()<<"ms");
     ave_mask_cal= (ave_mask_cal*(i_n-1) + mask_method.toc())/i_n;
-    ROS_DEBUG_STREAM("ave mask calculate: "<<ave_mask_cal<<"ms");
+    ROS_DEBUG_STREAM("ave mask calculate_original: "<<ave_mask_cal<<"ms");
   }
   pc_masks.clear();
   if(compare_rect){
@@ -1108,7 +1112,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
           // }
           // //ROS_INFO_STREAM("d2 = "<<d2);
           // Gs = 1.0/d2;
-          Gs = grid_param[grid_index];
+          Gs = pc_manager.grid_param[0][grid_index];
           grid_index++;
           int index = v*col_c + u*c;
           double x0 = Gs*Gr_x;
