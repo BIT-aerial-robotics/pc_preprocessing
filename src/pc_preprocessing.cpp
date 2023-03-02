@@ -326,7 +326,7 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
                ROS_ERROR("The matched data has been poped out!");
                m_yolo_match.unlock();
                return;
-          }
+          }   
      }
      if(yolo_depth.empty() && !data_matched){
           ROS_ERROR("you need extend your queue size!");
