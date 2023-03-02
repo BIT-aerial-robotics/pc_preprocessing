@@ -282,9 +282,9 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
           
      }
      j_n++;
-     ROS_INFO_STREAM("vekf predict: "<<t_predict.toc()<<" ms");
+     // ROS_INFO_STREAM("vekf predict: "<<t_predict.toc()<<" ms");
      ave_ekf_predict = (ave_ekf_predict*(j_n-1) + t_predict.toc())/j_n;
-     ROS_INFO_STREAM("average vekf predict: "<<ave_ekf_predict<<" ms\n");
+     // ROS_INFO_STREAM("average vekf predict: "<<ave_ekf_predict<<" ms\n");
 }
 
 void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
@@ -981,6 +981,8 @@ int main(int argc, char **argv)
      ROS_INFO_STREAM("n_skip: "<<n_skip);
      fsSettings["resolution_cmp"]>>resolution_cmp;
      ROS_INFO_STREAM("resolution_cmp: "<<resolution_cmp);
+     fsSettings["original_cmp"]>>original_cmp;
+     ROS_INFO_STREAM("original_cmp: "<<original_cmp);
 
      std::thread prepro_pc = std::thread(&Preprocess);
      std::thread yolo_update = std::thread(&Yolo_Update);

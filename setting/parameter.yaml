@@ -13,5 +13,6 @@ compare_upsampling: 0
 first_loop: 0
 time_compare: 0
 resolution_cmp: 0
+original_cmp: 0
 n_skip: 3
 
