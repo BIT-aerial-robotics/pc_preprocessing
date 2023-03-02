@@ -876,6 +876,8 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   cv::Mat image_upsample = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0)); //initialize the mat variable according to the size of image
   cv::Mat image_upsample_no_rect = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
   cv::Mat image_upsample_original = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
+  cv::Mat image_upsample_1 = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
+  cv::Mat image_upsample_5 = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
   int size_3c = image_upsample.rows*image_upsample.cols*c;
   //TicToc allocate;
   // double* ima3d = (double*)malloc(sizeof(double)*(size_3c));
@@ -1022,15 +1024,31 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   int image_size = w*h*c;
   double* ima3do = (double*)malloc(sizeof(double)*(image_size));
   double* ima3do_ = (double*)malloc(sizeof(double)*(image_size));
+  double* ima3d5 = (double*)malloc(sizeof(double)*(image_size));
+  double* ima3d5_ = (double*)malloc(sizeof(double)*(image_size));
+  double* ima3d1 = (double*)malloc(sizeof(double)*(image_size));
+  double* ima3d1_ = (double*)malloc(sizeof(double)*(image_size));
   if(compare_upsampling){
     //set zero
     for(int i = 0; i<image_size; i++){
       *(ima3do + i) = 0;
       *(ima3do_ + i) = 0;
+      
     }
   }
+  if(resolution_cmp){
+    //set zero
+    for(int i = 0; i<image_size; i++){
+      *(ima3d1 + i) = 0;
+      *(ima3d1_ + i) = 0;
+      *(ima3d5 + i) = 0;
+      *(ima3d5_ + i) = 0;
+      
+    }
+  }
+  
   //compare time cost of calculating pixel distance 
-  if(time_compare){
+  if(compare_upsampling){
     TicToc mask_method;//计算消耗主要在计算部分
     
     for (int i_g = 0; i_g < mask_size; i_g ++){
@@ -1083,6 +1101,79 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     ave_mask_cal= (ave_mask_cal*(i_n-1) + mask_method.toc())/i_n;
     ROS_DEBUG_STREAM("ave mask calculate_original: "<<ave_mask_cal<<"ms");
   }
+  if(resolution_cmp){
+    for (int i_g = 0; i_g < mask_size; i_g ++){
+    
+      double Gr_x = pc_masks[i_g].point.Gr_x;
+      double Gr_y = pc_masks[i_g].point.Gr_y;
+      double Gr_z = pc_masks[i_g].point.Gr_z;
+      double Gs = 0;
+      double G_x = pc_masks[i_g].point.G_x;
+      double G_y = pc_masks[i_g].point.G_y;
+      double G_z = pc_masks[i_g].point.G_z;
+
+      double pu = pc_masks[i_g].point.u_px;
+      double pv = pc_masks[i_g].point.v_px;
+      double d2;
+      int n_split1 = 1;
+      double m_split1 = 1.0/n_split1;
+      int n_split5 = 5;
+      double m_split5 = 1.0/n_split5;
+      int grid_index = 0;
+      int list_index1 = int((pu-int(pu))/m_split1) + int((pv-int(pv))/m_split1)*n_split1;
+      int list_index5 = int((pu-int(pu))/m_split5) + int((pv-int(pv))/m_split5)*n_split5;
+      vector<double>& grid_map1 = pc_manager.grid_param1[list_index1];
+      vector<double>& grid_map5 = pc_manager.grid_param5[list_index5]; 
+      for(int v = pc_masks[i_g].v_down; v<pc_masks[i_g].v_up; v++){
+        for(int u =  pc_masks[i_g].u_down; u<pc_masks[i_g].u_up; u++){
+          d2 = sqrt((u - pu)*(u - pu) + (v-pv)*(v-pv));
+          if(d2<0.0001){
+            //ROS_INFO_STREAM("d2 = "<<d2);
+            d2 = 0.0001;
+            
+          }
+          //ROS_INFO_STREAM("d2 = "<<d2);
+          Gs = grid_map1[grid_index];
+          int index = v*image_upsample.cols*c + u*c;
+          double x0 = Gs*Gr_x;
+          double x1 = Gs*Gr_y;
+          double x2 = Gs*Gr_z;
+          double y0 = Gs*G_x;
+          double y1 = Gs*G_y;
+          double y2 = Gs*G_z;
+          //m_thread.lock();
+          if(ima3d == NULL || ima3d_ == NULL){
+            ROS_ERROR("ima3d or ima3d_ pointer is NULL! restart!");
+            pc_manager.maskn.malloc_ok = false;
+            return 0;
+          }
+          ima3d1[index] += x0;
+          ima3d1[index +1] += x1;
+          ima3d1[index +2] += x2;
+          ima3d1_[index] += y0;
+          ima3d1_[index +1] += y1;
+          ima3d1_[index +2] += y2;
+
+          Gs = grid_map5[grid_index];
+          grid_index++;
+          x0 = Gs*Gr_x;
+          x1 = Gs*Gr_y;
+          x2 = Gs*Gr_z;
+          y0 = Gs*G_x;
+          y1 = Gs*G_y;
+          y2 = Gs*G_z;
+          ima3d5[index] += x0;
+          ima3d5[index +1] += x1;
+          ima3d5[index +2] += x2;
+          ima3d5_[index] += y0;
+          ima3d5_[index +1] += y1;
+          ima3d5_[index +2] += y2;
+          // m_thread.unlock();
+        }
+      }
+    }
+  }
+
   pc_masks.clear();
   if(compare_rect){
     double* ima3d = pc_manager.mask_no_rect.ima3d;
@@ -1101,19 +1192,19 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       double pu = pc_masks_no_rect[i_g].point.u_px;
       double pv = pc_masks_no_rect[i_g].point.v_px;
       double d2;
-      int grid_index = 0;
+      // int grid_index = 0;
       for(int v = pc_masks_no_rect[i_g].v_down; v<pc_masks_no_rect[i_g].v_up; v++){
         for(int u =  pc_masks_no_rect[i_g].u_down; u<pc_masks_no_rect[i_g].u_up; u++){
-          // d2 = sqrt((u - pu)*(u - pu) + (v-pv)*(v-pv));
-          // if(d2<0.0001){
-          //   //ROS_INFO_STREAM("d2 = "<<d2);
-          //   d2 = 0.0001;
+          d2 = sqrt((u - pu)*(u - pu) + (v-pv)*(v-pv));
+          if(d2<0.0001){
+            //ROS_INFO_STREAM("d2 = "<<d2);
+            d2 = 0.0001;
             
-          // }
+          }
           // //ROS_INFO_STREAM("d2 = "<<d2);
-          // Gs = 1.0/d2;
-          Gs = pc_manager.grid_param[0][grid_index];
-          grid_index++;
+          Gs = 1.0/d2;
+          // Gs = pc_manager.grid_param[0][grid_index];
+          // grid_index++;
           int index = v*col_c + u*c;
           double x0 = Gs*Gr_x;
           double x1 = Gs*Gr_y;
@@ -1144,104 +1235,6 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   /*save the max denominator in all 4 serials data*/
   if(pc_manager.init){
     
-    // if(compare_rect){
-    //   double* ima3d = pc_manager.mask_no_rect.ima3d;
-    //   double* ima3d_ = pc_manager.mask_no_rect.ima3d_;
-      
-
-    //   for(int vali = minrow; vali < maxrow; vali++){
-    //     for(int uali = (int)minmaxuv.umin; uali < (int)minmaxuv.umax; uali++){
-    //       unsigned char *row_ptr = image_upsample.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
-    //       unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
-    //       //notice the order is B,G,R in opencv, and R,G,B in matlab
-    //       int index = vali*image_upsample.cols*c + uali*c;
-    //       /*calculating denominator and set to 1 with 0 case*/
-    //       double denominator_x = 0;
-    //       double denominator_y = 0;
-    //       double denominator_z = 0;
-    //       for(int i = 0; i<WINDOW_SIZE; i++){
-    //         denominator_x += pc_manager.mask_win[i].ima3d[index];
-    //         denominator_y += pc_manager.mask_win[i].ima3d[index+1];
-    //         denominator_z += pc_manager.mask_win[i].ima3d[index+2];
-    //       }
-    //       if(denominator_x == 0) denominator_x = 1;
-    //       if(denominator_y == 0) denominator_y = 1;
-    //       if(denominator_z == 0) denominator_z = 1;
-    //       // if (ima3d[index]==0) {ima3d[index]=1;}
-    //       // if (ima3d[index+1]==0) {ima3d[index+1]=1;}
-    //       // if (ima3d[index+2]==0) {ima3d[index+2]=1;}
-    //       // Dx_i = ima3d_[index]/ima3d[index];
-    //       // Dy_i = ima3d_[index + 1]/ima3d[index + 1];
-    //       // Dz_i = ima3d_[index + 2]/ima3d[index + 2];
-
-    //       /*calculating depth map(befor normalized) and save the max one*/
-    //       double Dx_i = 0;//不赋值会有问题
-    //       double Dy_i = 0;
-    //       double Dz_i = 0;
-    //       for(int i = 0; i <WINDOW_SIZE; i++){
-    //         Dx_i += (pc_manager.mask_win[i].ima3d_[index])/denominator_x;
-    //         Dy_i += (pc_manager.mask_win[i].ima3d_[index+1])/denominator_y;
-    //         Dz_i += (pc_manager.mask_win[i].ima3d_[index+2])/denominator_z;
-    //       }
-    //       if(maxima3d_no_rect[0] < Dx_i ) (maxima3d_no_rect[0] = Dx_i); 
-    //       if(maxima3d_no_rect[1] < Dy_i ) (maxima3d_no_rect[1] = Dy_i) ;
-    //       if(maxima3d_no_rect[2] < Dz_i ) (maxima3d_no_rect[2] = Dz_i) ;
-    //     }
-    //   }
-    //   for(int vali = minrow; vali < maxrow; vali++)
-    //     for(int uali = (int)minmaxuv.umin; uali < (int)minmaxuv.umax; uali++){
-    //       unsigned char *row_ptr = image_upsample_no_rect.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
-    //       unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
-    //       //notice the order is B,G,R in opencv, and R,G,B in matlab
-    //       int index = vali*image_upsample.cols*c + uali*c;
-
-    //       double denominator_x = 0;
-    //       double denominator_y = 0;
-    //       double denominator_z = 0;
-    //       for(int i = 0; i<WINDOW_SIZE; i++){
-    //         denominator_x += pc_manager.mask_win[i].ima3d[index];
-    //         denominator_y += pc_manager.mask_win[i].ima3d[index+1];
-    //         denominator_z += pc_manager.mask_win[i].ima3d[index+2];
-    //       }
-    //       // if(denominator_x == 0) denominator_x = 1;
-    //       // if(denominator_y == 0) denominator_y = 1;
-    //       // if(denominator_z == 0) denominator_z = 1;
-    //       double Dx_i = 0;//不赋值会有问题
-    //       double Dy_i = 0;
-    //       double Dz_i = 0;
-    //       for(int i = 0; i <WINDOW_SIZE; i++){
-    //         Dx_i += (pc_manager.mask_win[i].ima3d_[index]);
-    //         Dy_i += (pc_manager.mask_win[i].ima3d_[index+1]);
-    //         Dz_i += (pc_manager.mask_win[i].ima3d_[index+2]);
-    //       }
-    //       data_ptr[2] = (unsigned char)(255.0*( Dx_i/denominator_x/maxima3d_no_rect[0]));
-    //       data_ptr[0] = (unsigned char)(255.0*( Dy_i/denominator_y/maxima3d_no_rect[1]));
-    //       data_ptr[1] = (unsigned char)(255.0*( Dz_i/denominator_z/maxima3d_no_rect[2]));
-    //   }
-    // }
-    // double denominator_x = 0;
-    //       double denominator_y = 0;
-    //       double denominator_z = 0;
-    //       for(int i = 0; i<WINDOW_SIZE; i++){
-    //         denominator_x += pc_manager.mask_win[i].ima3d[index];
-    //         denominator_y += pc_manager.mask_win[i].ima3d[index+1];
-    //         denominator_z += pc_manager.mask_win[i].ima3d[index+2];
-    //       }
-    //       // if(denominator_x == 0) denominator_x = 1;
-    //       // if(denominator_y == 0) denominator_y = 1;
-    //       // if(denominator_z == 0) denominator_z = 1;
-    //       double Dx_i = 0;//不赋值会有问题
-    //       double Dy_i = 0;
-    //       double Dz_i = 0;
-    //       for(int i = 0; i <WINDOW_SIZE; i++){
-    //         Dx_i += (pc_manager.mask_win[i].ima3d_[index])/denominator_x;
-    //         Dy_i += (pc_manager.mask_win[i].ima3d_[index+1])/denominator_y;
-    //         Dz_i += (pc_manager.mask_win[i].ima3d_[index+2])/denominator_z;
-    //       }
-    //       data_ptr[2] = (unsigned char)(255.0*( Dx_i/denominator_x/maxima3d_no_rect[0]));
-    //       data_ptr[0] = (unsigned char)(255.0*( Dy_i/denominator_y/maxima3d_no_rect[1]));
-    //       data_ptr[1] = (unsigned char)(255.0*( Dz_i/denominator_z/maxima3d_no_rect[2]));
-
     //4mask process
     TicToc comp_max;
     double Dx_i;
@@ -1294,6 +1287,19 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
           data_ptr_o[0] = (unsigned char)(255.0*(( ima3do_[index+1])/(ima3do[index+1]))/maxima3d[1]);
           data_ptr_o[1] = (unsigned char)(255.0*(( ima3do_[index+2])/(ima3do[index+2]))/maxima3d[2]);
         }
+        if(resolution_cmp){
+          unsigned char *row_ptr_1 = image_upsample_1.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
+          unsigned char *data_ptr_1 = &row_ptr_1[uali * image_upsample_1.channels()]; 
+          unsigned char *row_ptr_5 = image_upsample_5.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
+          unsigned char *data_ptr_5 = &row_ptr_5[uali * image_upsample_5.channels()];
+          data_ptr_1[2] = (unsigned char)(255.0*(( ima3d1_[index])/(ima3d1[index]))/ maxima3d[0]);
+          data_ptr_1[0] = (unsigned char)(255.0*(( ima3d1_[index+1])/(ima3d1[index+1]))/maxima3d[1]);
+          data_ptr_1[1] = (unsigned char)(255.0*(( ima3d1_[index+2])/(ima3d1[index+2]))/maxima3d[2]);
+
+          data_ptr_5[2] = (unsigned char)(255.0*(( ima3d5_[index])/(ima3d5[index]))/ maxima3d[0]);
+          data_ptr_5[0] = (unsigned char)(255.0*(( ima3d5_[index+1])/(ima3d5[index+1]))/maxima3d[1]);
+          data_ptr_5[1] = (unsigned char)(255.0*(( ima3d5_[index+2])/(ima3d5[index+2]))/maxima3d[2]);
+        }
         if(compare_rect){
           unsigned char *row_ptr_no_rect = image_upsample_no_rect.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
           unsigned char *data_ptr_no_rect = &row_ptr_no_rect[uali * image_upsample_original.channels()]; 
@@ -1338,11 +1344,15 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     
     
     if(compare_rect){
-      cv::imshow("image_upsample_no_rect", image_upsample_no_rect);
+      cv::imshow("XYZ_no_motion_compensation", image_upsample_no_rect);
       
     }
     if(compare_upsampling){
-      cv::imshow("image_upsample_original_upsampling", image_upsample_original);
+      cv::imshow("XYZ_continue_method", image_upsample_original);
+    }
+    if(resolution_cmp){
+      cv::imshow("XYZ_resolution_1.0", image_upsample_1);
+      cv::imshow("XYZ_resolution_0.2", image_upsample_5);
     }
     
     if(image_save){
@@ -1400,10 +1410,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     }
     // search_box_yolo
     // // if(ifdetection==1){
-      // cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-      // cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-      // cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
-      // cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      
       // // ROS_INFO_STREAM("box_grid_points.size() = "<<box_grid_points.size());
       m_visualization.lock();
       // for(int i = 0;i < box_grid_points.size();i++){
@@ -1439,8 +1446,12 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       cv_bridge::CvImagePtr cv_ptr;
       cv_ptr = cv_bridge::toCvCopy(imgrgb_cur, sensor_msgs::image_encodings::BGR8);
       img_cur  = cv_ptr -> image;
-      cv::imshow("image_upsample", image_upsample);
-      cv::imshow("image", img_cur);
+      cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+      cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+      cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      cv::imshow("XYZ_resolution_0.1", image_upsample);
+      cv::imshow("RGB", img_cur);
       cv::waitKey(1);
     }
   }else{
@@ -1452,6 +1463,10 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   }
   free(ima3do);
   free(ima3do_);
+  free(ima3d1);
+  free(ima3d1_);
+  free(ima3d5);
+  free(ima3d5_);
   return 0;
 }
 

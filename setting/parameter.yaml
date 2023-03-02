@@ -2,7 +2,7 @@
 
 grid: 5
 #generate distance list for up-sampling
-n_split: 100 #split [0,1) into n_split part
+n_split: 10 #split [0,1) into n_split part
 
 
 image_save: 0
@@ -12,6 +12,6 @@ compare_rect: 0
 compare_upsampling: 0
 first_loop: 0
 time_compare: 0
-
-
+resolution_cmp: 0
+n_skip: 3
 

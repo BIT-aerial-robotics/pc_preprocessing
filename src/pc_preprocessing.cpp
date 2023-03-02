@@ -281,7 +281,10 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
           }
           
      }
-     // ROS_INFO_STREAM("vekf predict: "<<t_predict.toc()<<" ms");
+     j_n++;
+     ROS_INFO_STREAM("vekf predict: "<<t_predict.toc()<<" ms");
+     ave_ekf_predict = (ave_ekf_predict*(j_n-1) + t_predict.toc())/j_n;
+     ROS_INFO_STREAM("average vekf predict: "<<ave_ekf_predict<<" ms\n");
 }
 
 void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
@@ -290,8 +293,8 @@ void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
      darknet_ros_msgs::BoundingBoxes boundingBoxesResults_ = *msg;
      int boxno = boundingBoxesResults_.bounding_boxes.size();
      long long cur_yolo_timestamp = msg->header.stamp.toNSec();
-     ROS_INFO_STREAM("timestamp = "<<cur_yolo_timestamp);
-     ROS_INFO_STREAM("timestamp_last = "<<last_yolo_timestamp);
+     // ROS_INFO_STREAM("timestamp = "<<cur_yolo_timestamp);
+     // ROS_INFO_STREAM("timestamp_last = "<<last_yolo_timestamp);
      Pc_Vector yolo_cur_pc_data;
      if(boxno == 0){
           ROS_ERROR("nox = 0 !!!!!");
@@ -636,11 +639,13 @@ void Yolo_Update(){
 
                     //      // cout<<"===============================================================================================================================================================================";
                     // }
-                    ROS_INFO_STREAM("calculate_yolo_depth_init time: "<<t_update.toc()<<" ms");
+                    // ROS_INFO_STREAM("calculate_yolo_depth_init time: "<<t_update.toc()<<" ms");
                     //depth
                     uav_position_lidar = depth_estimate(ave_grid_3d, yolo_u_min, yolo_u_max, yolo_v_min, yolo_v_max, grid_k, 20); 
-
-                    ROS_INFO_STREAM("initialization time: "<<t_update.toc()<<" ms");
+                    k_n++;
+                    ROS_DEBUG_STREAM("depth_estimate time: "<<t_update.toc()<<" ms");                 
+                    ave_ekf_update_alg2 = (ave_ekf_update_alg2*(k_n-1) + t_update.toc())/k_n;
+                    ROS_DEBUG_STREAM("average vekf depth_estimate: "<<ave_ekf_update_alg2<<" ms");
                          // uav_position_lidar = uav_final_pos;
                          
                     // }else{
@@ -677,7 +682,7 @@ void Yolo_Update(){
                     //      uav_position_lidar = depth_estimate(ave_grid_3d, yolo_u_min, yolo_u_max, yolo_v_min, yolo_v_max, grid_k, ave_grid_3d.front().size()-1); 
                     //      ROS_INFO_STREAM("yolo depth estimating time: "<<t_update.toc()<<" ms");
                     // }
-                    ROS_INFO_STREAM("yolo_depth_no_rect = "<<uav_position_lidar.x()<<", "<<uav_position_lidar.y()<<", "<<uav_position_lidar.z());
+                    ROS_DEBUG_STREAM("yolo_depth_no_rect = "<<uav_position_lidar.x()<<", "<<uav_position_lidar.y()<<", "<<uav_position_lidar.z());
                     if(uav_position_lidar.x()<1){
                          //failed results
                          // ROS_ERROR("estimated depth < 1m, depth estimation failed! continue !");
@@ -826,8 +831,8 @@ void Yolo_Update(){
                                    sigma_feature[0], 0,
                                    0, sigma_feature[1];
                     Q_variance = R_cam_lidar.transpose()*f1*sigma_yolo_x*f1.transpose()*R_cam_lidar + Q_variance;
-                    ROS_DEBUG_STREAM("Q_variance = "<<endl<<Q_variance.matrix());
-                    ROS_DEBUG_STREAM("sigma_feature = "<< sigma_feature[0]<<", "<<sigma_feature[1]);
+                    // ROS_DEBUG_STREAM("Q_variance = "<<endl<<Q_variance.matrix());
+                    // ROS_DEBUG_STREAM("sigma_feature = "<< sigma_feature[0]<<", "<<sigma_feature[1]);
                     /*********/
                     y = z_k - C_T*x_k_k;   //nonlinear
                     S=C_T*P_k_k*C_T.transpose() + Q_variance; //observation
@@ -856,9 +861,15 @@ void Yolo_Update(){
                     p_box.point.x = p_b.x();
                     p_box.point.y = p_b.y();
                     p_box.point.z = p_b.z();
-                    ROS_INFO_STREAM("yolo_depth_update = "<<x_k_k.x()<<", "<<x_k_k.y()<<", "<<x_k_k.z());
+                    ROS_DEBUG_STREAM("yolo_depth_update = "<<x_k_k.x()<<", "<<x_k_k.y()<<", "<<x_k_k.z());
                     v_ekf.publish(p_box);
-                    // ROS_DEBUG_STREAM("update time : "<<t_update.toc()<<" ms");
+                    
+                    ROS_DEBUG_STREAM("update time : "<<t_update.toc()<<" ms");
+                    ave_ekf_update = (ave_ekf_update*(k_n-1) + t_update.toc())/k_n;
+                    ROS_DEBUG_STREAM("average vekf update: "<<ave_ekf_update<<" ms");
+
+
+
                }catch(std::bad_alloc){
                     ROS_ERROR("terminate called after throwing an instance of 'std::bad_alloc'     in yolo update part.");
                    continue;
@@ -966,7 +977,10 @@ int main(int argc, char **argv)
      ROS_INFO_STREAM("compare_rect: "<<compare_upsampling);
      fsSettings["time_compare"]>>time_compare;
      ROS_INFO_STREAM("time_compare: "<<time_compare);
- 
+     fsSettings["n_skip"]>>n_skip;
+     ROS_INFO_STREAM("n_skip: "<<n_skip);
+     fsSettings["resolution_cmp"]>>resolution_cmp;
+     ROS_INFO_STREAM("resolution_cmp: "<<resolution_cmp);
 
      std::thread prepro_pc = std::thread(&Preprocess);
      std::thread yolo_update = std::thread(&Yolo_Update);

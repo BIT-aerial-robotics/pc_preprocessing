@@ -102,7 +102,7 @@ int n_split = 5;
 double m_split = 1.0/n_split;
 int param_n = (grid*2+1)*(grid*2+1);
 int list_num = n_split*n_split;
-vector<double> k_value;
+vector<double> k_value, k_value1, k_value5;
 
 
 template<typename T>
@@ -299,7 +299,7 @@ class PC_Wrapper{
     livox_ros_driver::CustomMsg::ConstPtr pc_win_buffer[WINDOW_SIZE];
     Eigen::Quaterniond q_wb[WINDOW_SIZE];
     Eigen::Vector3d t_wb[WINDOW_SIZE]; 
-    vector<vector<double>> grid_param;
+    vector<vector<double>> grid_param, grid_param1, grid_param5;
 };
 
 
@@ -397,6 +397,8 @@ double sum_x = 0;
 
 //calculate ave time
 int i_n = 0;
+int j_n = 0;
+int k_n = 0;
 double ave_lock = 0;
 double ave_lock_i = 0;
 double ave_mask_process = 0;
@@ -404,6 +406,10 @@ double ave_mask_process_i = 0;
 double ave_mask_cal = 0;
 double ave_mask_cal_i = 0;
 double ave_total = 0;
+double ave_mask_origin = 0;
+double ave_ekf_predict = 0;
+double ave_ekf_update_alg2 = 0;
+double ave_ekf_update = 0;
 
 
 
@@ -523,9 +529,10 @@ int visualization;
 int show_image;
 int compare_rect;
 int compare_upsampling;
+int resolution_cmp;
 int first_loop;
 int time_compare;
-
+int n_skip = 3;
 /******************************************/
 PC_Wrapper pc_manager;
 void Preprocess(){
@@ -559,6 +566,75 @@ void Preprocess(){
             }
             pc_manager.grid_param.emplace_back(d_map);
             // cout<<endl;
+        }
+    }
+    //
+    if(resolution_cmp){
+        int n_split = 1;
+        double m_split = 1.0/n_split;
+        for(int i = 0; i<n_split; i++){
+            k_value1.emplace_back(i*m_split);//[0,1)
+        }
+        // double grid_param[list_num][param_n];
+        // vector<vector<double>> grid_param;
+        // double 
+        for(int index_v = 0; index_v < n_split; index_v++){
+            for(int index_u = 0; index_u < n_split; index_u++){
+                int index_list = index_v*n_split + index_u;
+                // ROS_INFO_STREAM("index_list = "<<index_list);
+                double k_u = k_value1[index_u];
+                double k_v = k_value1[index_v];
+                vector<double> d_map;
+                for(int j = -grid; j<=grid; j++){
+                    for(int i = -grid; i<=grid; i++){
+                        int index = (i+grid)+(j+grid)*grid*2;
+                        // ROS_INFO_STREAM("index = "<<index);
+                        double d2 = (j-k_v)*(j-k_v) + (i-k_u)*(i-k_u);
+                        if(d2 == 0){
+                            d_map.emplace_back(10000);
+                        }else{
+                            d_map.emplace_back(1.0/sqrt(d2));
+                        }
+                        // cout<<grid_param[index_list][index]<<"  ";
+                    }
+                    // cout<<endl;
+                }
+                pc_manager.grid_param1.emplace_back(d_map);
+                // cout<<endl;
+            }
+        }
+        n_split = 5;
+        m_split = 1.0/n_split;
+        for(int i = 0; i<n_split; i++){
+            k_value5.emplace_back(i*m_split);//[0,1)
+        }
+        // double grid_param[list_num][param_n];
+        // vector<vector<double>> grid_param;
+        // double 
+        for(int index_v = 0; index_v < n_split; index_v++){
+            for(int index_u = 0; index_u < n_split; index_u++){
+                int index_list = index_v*n_split + index_u;
+                // ROS_INFO_STREAM("index_list = "<<index_list);
+                double k_u = k_value5[index_u];
+                double k_v = k_value5[index_v];
+                vector<double> d_map;
+                for(int j = -grid; j<=grid; j++){
+                    for(int i = -grid; i<=grid; i++){
+                        int index = (i+grid)+(j+grid)*grid*2;
+                        // ROS_INFO_STREAM("index = "<<index);
+                        double d2 = (j-k_v)*(j-k_v) + (i-k_u)*(i-k_u);
+                        if(d2 == 0){
+                            d_map.emplace_back(10000);
+                        }else{
+                            d_map.emplace_back(1.0/sqrt(d2));
+                        }
+                        // cout<<grid_param[index_list][index]<<"  ";
+                    }
+                    // cout<<endl;
+                }
+                pc_manager.grid_param5.emplace_back(d_map);
+                // cout<<endl;
+            }
         }
     }
     ROS_INFO("Prepreocess Thread Initialized!!!");
@@ -748,7 +824,7 @@ void Preprocess(){
                 
 
                 //omp_set_num_threads(4);
-                int n_skip = 3;
+                
                 Pc_Vector_Ptr pc_vector (new Pc_Vector());
                 pc_vector->timestamp = imgrgb_cur->header.stamp.toNSec();//这里不能用cur_timestamp，因为这里已经解锁了，所以这个变量可能已近更新了
                 pc_vector->q_wb = pc_manager.q_wb[cur_id];
