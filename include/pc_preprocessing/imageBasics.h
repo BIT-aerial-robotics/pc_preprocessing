@@ -830,7 +830,7 @@ void Preprocess(){
                 
 
                 //omp_set_num_threads(4);
-                
+                TicToc start;
                 Pc_Vector_Ptr pc_vector (new Pc_Vector());
                 pc_vector->timestamp = imgrgb_cur->header.stamp.toNSec();//这里不能用cur_timestamp，因为这里已经解锁了，所以这个变量可能已近更新了
                 pc_vector->q_wb = pc_manager.q_wb[cur_id];
@@ -844,7 +844,7 @@ void Preprocess(){
                 pc_manager.maskn.pc_masks_single.clear();
                 pc_manager.maskn.pc_masks_single.reserve(total_size/n_skip+2);
 
-                TicToc start;
+                
                 #pragma omp parallel for
                 for(int k =0; k<WINDOW_SIZE; k++){
                 

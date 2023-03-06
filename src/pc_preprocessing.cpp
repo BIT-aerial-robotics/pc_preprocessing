@@ -973,8 +973,8 @@ int main(int argc, char **argv)
      ROS_INFO_STREAM("show_image: "<<show_image);
      fsSettings["compare_rect"]>>compare_rect;
      ROS_INFO_STREAM("compare_rect: "<<compare_rect);
-     fsSettings["compare_rect"]>>compare_upsampling;
-     ROS_INFO_STREAM("compare_rect: "<<compare_upsampling);
+     fsSettings["compare_upsampling"]>>compare_upsampling;
+     ROS_INFO_STREAM("compare_upsampling: "<<compare_upsampling);
      fsSettings["time_compare"]>>time_compare;
      ROS_INFO_STREAM("time_compare: "<<time_compare);
      fsSettings["n_skip"]>>n_skip;

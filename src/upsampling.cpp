@@ -653,76 +653,6 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   }
 
 
-
-  //compare time with the original method
-  if(original_cmp){
-    double Dx_i;
-    double Dy_i;
-    double Dz_i;
-    TicToc cmp_t;//计算消耗主要在计算部分
-    for (int v=0; v< maxrow - minrow; v=v+1){
-      for (int u= (int)minmaxuv.umin; u< (int)minmaxuv.umax; u=u+1){
-        long int gridno = (v+minrow)*w+u;
-	      int s_g = pc_manager.pc_array_grid[gridno].size();
-        double x0 = 0;
-        double x1 = 0;
-        double x2 = 0;
-        double y0 = 0;
-        double y1 = 0;
-        double y2 = 0;
-        for (int i_g = 0; i_g < s_g; i_g ++){
-          double pu = pc_manager.pc_array_grid[gridno][i_g].u_px;
-          double pv = pc_manager.pc_array_grid[gridno][i_g].v_px;
-          double dx = pc_manager.pc_array_grid[gridno][i_g].x_3d;
-          double dy = abs(pc_manager.pc_array_grid[gridno][i_g].y_3d);
-          double dz = abs(pc_manager.pc_array_grid[gridno][i_g].z_3d);
-          double d2 = sqrt((u - pu)*(u - pu) + (v-pv)*(v-pv));
-          if(d2<0.0001){
-            //ROS_INFO_STREAM("d2 = "<<d2);
-            d2 = 0.0001;    
-          }
-          double Gr_x = pc_manager.pc_array_grid[gridno][i_g].Gr_x;
-          double Gr_y = pc_manager.pc_array_grid[gridno][i_g].Gr_y;
-          double Gr_z = pc_manager.pc_array_grid[gridno][i_g].Gr_z;
-          double Gs = 1.0/d2;
-          double G_x = pc_manager.pc_array_grid[gridno][i_g].G_x;
-          double G_y = pc_manager.pc_array_grid[gridno][i_g].G_y;
-          double G_z = pc_manager.pc_array_grid[gridno][i_g].G_z;
-          x0 += Gs*Gr_x;
-          x1 += Gs*Gr_y;
-          x2 += Gs*Gr_z;
-          y0 += Gs*G_x;
-          y1 += Gs*G_y;
-          y2 += Gs*G_z;
-	      }
-
-        pc_manager.pc_array_grid[gridno].clear();
-
-        if (x0==0) {x0=1;}
-        if (x1==0) {x1=1;}
-        if (x2==0) {x2=1;}
-
-        Dx_i = y0/x0;
-        Dy_i = y1/x1;
-        Dz_i = y2/x2;
-        ima3d_time[(v+minrow)*image_upsample.cols*c + u*c] = Dx_i;
-        ima3d_time[(v+minrow)*image_upsample.cols*c + u*c +1] = Dy_i;
-        ima3d_time[(v+minrow)*image_upsample.cols*c + u*c +2] = Dz_i;
-                  
-      }
-    }
-    b_n++;
-    ROS_DEBUG_STREAM("original_step2: "<<cmp_t.toc()<<"ms");
-    ave_original_2= (ave_original_2*(b_n-1) + cmp_t.toc())/b_n;
-    ROS_DEBUG_STREAM("ave original_step2: "<<ave_original_2<<"ms");
-  }
-
-
-
-
-
-
-
   pc_masks.clear();
   if(compare_rect){
     double* ima3d = pc_manager.mask_no_rect.ima3d;
@@ -898,18 +828,91 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
     ave_total = (ave_total*(i_n-1) + all_time.toc())/i_n;
     ROS_DEBUG_STREAM("ave total: "<<ave_total<<"ms\n");
     
-    
-    if(compare_rect){
-      cv::imshow("XYZ_no_motion_compensation", image_upsample_no_rect);
+
+    //compare time with the original method
+    if(original_cmp){
+      double Dx_i;
+      double Dy_i;
+      double Dz_i;
+      TicToc cmp_t;//计算消耗主要在计算部分
+      for (int v=0; v< maxrow - minrow; v=v+1){
+        for (int u= (int)minmaxuv.umin; u< (int)minmaxuv.umax; u=u+1){
+          long int gridno = (v+minrow)*w+u;
+          int s_g = pc_manager.pc_array_grid[gridno].size();
+          double x0 = 0;
+          double x1 = 0;
+          double x2 = 0;
+          double y0 = 0;
+          double y1 = 0;
+          double y2 = 0;
+          for (int i_g = 0; i_g < s_g; i_g ++){
+            double pu = pc_manager.pc_array_grid[gridno][i_g].u_px;
+            double pv = pc_manager.pc_array_grid[gridno][i_g].v_px;
+            double dx = pc_manager.pc_array_grid[gridno][i_g].x_3d;
+            double dy = abs(pc_manager.pc_array_grid[gridno][i_g].y_3d);
+            double dz = abs(pc_manager.pc_array_grid[gridno][i_g].z_3d);
+            double d2 = sqrt((u - pu)*(u - pu) + (v-pv)*(v-pv));
+            if(d2<0.0001){
+              //ROS_INFO_STREAM("d2 = "<<d2);
+              d2 = 0.0001;    
+            }
+            double Gr_x = pc_manager.pc_array_grid[gridno][i_g].Gr_x;
+            double Gr_y = pc_manager.pc_array_grid[gridno][i_g].Gr_y;
+            double Gr_z = pc_manager.pc_array_grid[gridno][i_g].Gr_z;
+            double Gs = 1.0/d2;
+            double G_x = pc_manager.pc_array_grid[gridno][i_g].G_x;
+            double G_y = pc_manager.pc_array_grid[gridno][i_g].G_y;
+            double G_z = pc_manager.pc_array_grid[gridno][i_g].G_z;
+            x0 += Gs*Gr_x;
+            x1 += Gs*Gr_y;
+            x2 += Gs*Gr_z;
+            y0 += Gs*G_x;
+            y1 += Gs*G_y;
+            y2 += Gs*G_z;
+          }
+
+          pc_manager.pc_array_grid[gridno].clear();
+
+          if (x0==0) {x0=1;}
+          if (x1==0) {x1=1;}
+          if (x2==0) {x2=1;}
+
+          Dx_i = y0/x0;
+          Dy_i = y1/x1;
+          Dz_i = y2/x2;
+          ima3d_time[(v+minrow)*image_upsample.cols*c + u*c] = Dx_i;
+          ima3d_time[(v+minrow)*image_upsample.cols*c + u*c +1] = Dy_i;
+          ima3d_time[(v+minrow)*image_upsample.cols*c + u*c +2] = Dz_i;
+                    
+        }
+      }
       
+    
+      for(int vali = minrow; vali < maxrow; vali++)
+        for(int uali = (int)minmaxuv.umin; uali < (int)minmaxuv.umax; uali++){
+          unsigned char *row_ptr = image_upsample.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
+          unsigned char *data_ptr = &row_ptr[uali * image_upsample.channels()]; // data_ptr points to the pixel data to be accessed
+          //notice the order is B,G,R in opencv, and R,G,B in matlab
+          int index = vali*image_upsample.cols*c + uali*c;
+          //compare with the original upsampling algorithm
+          
+        
+        if(original_cmp){
+          unsigned char *row_ptr_o = image_time_cmp.ptr<unsigned char>(vali);  // row_ptr is the pointer pointing to row vali
+          unsigned char *data_ptr_o = &row_ptr_o[uali * image_time_cmp.channels()]; 
+          data_ptr_o[2] = (unsigned char)(255.0*( ima3d_time[index])/ maxima3d[0]);
+          data_ptr_o[0] = (unsigned char)(255.0*( ima3d_time[index+1])/maxima3d[1]);
+          data_ptr_o[1] = (unsigned char)(255.0*( ima3d_time[index+2])/maxima3d[2]);
+        }
+        
+      }
+      b_n++;
+      ROS_DEBUG_STREAM("original_step2: "<<cmp_t.toc()<<"ms");
+      ave_original_2= (ave_original_2*(b_n-1) + cmp_t.toc())/b_n;
+      ROS_DEBUG_STREAM("ave original_step2: "<<ave_original_2<<"ms");
     }
-    if(compare_upsampling){
-      cv::imshow("XYZ_continue_method", image_upsample_original);
-    }
-    if(resolution_cmp){
-      cv::imshow("XYZ_resolution_1.0", image_upsample_1);
-      cv::imshow("XYZ_resolution_0.2", image_upsample_5);
-    }
+    
+    
     
     if(image_save){
       double hz = 0;
@@ -977,12 +980,23 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       m_visualization.unlock();
       // ifdetection = 0;
     // }
-    if(original_cmp){
-      cv::imshow("XYZ_original", image_time_cmp);
-    }
-
+    
     if(show_image){
+      if(original_cmp){
+        cv::imshow("XYZ_original", image_time_cmp);
+      }
 
+      if(compare_rect){
+        cv::imshow("XYZ_no_motion_compensation", image_upsample_no_rect);
+      
+      }
+      if(compare_upsampling){
+        cv::imshow("XYZ_continue_method", image_upsample_original);
+      }
+      if(resolution_cmp){
+        cv::imshow("XYZ_resolution_1.0", image_upsample_1);
+        cv::imshow("XYZ_resolution_0.2", image_upsample_5);
+      }
       //均值化
       // cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
       // cv::Mat img_normalized, img_cur_split[3];
