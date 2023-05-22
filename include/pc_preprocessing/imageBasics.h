@@ -73,9 +73,9 @@ namespace plt = matplotlibcpp;
 int w_img = 672, h_img = 376, c_img =3;
 
  
-const int original_freq = 10;
-const int cur_freq = 10;
-const int WINDOW_SIZE = 4;//0.4s*original_freq
+const int original_freq = 100;
+const int cur_freq = 100;
+const int WINDOW_SIZE = 40;//0.4s*original_freq
 const int Add_n = original_freq/cur_freq;
 int cur_add_n = 1;
 Matrix3d R_cam_lidar, K_in;
