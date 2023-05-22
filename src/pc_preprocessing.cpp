@@ -234,7 +234,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
                //                0, 0, 0, 0, 0, 0;
                
                //need to be adjusted
-               double cox = 1;
+               
                R_variance  << cox, 0, 0, 0, 0, 0,
                               0, cox, 0, 0, 0, 0,
                               0, 0, cox, 0, 0, 0,
@@ -570,7 +570,8 @@ void Yolo_Update(){
                TicToc t_update;
                //calculate the 3D position of yolo detection object(uav) in camera frame with matched pc data    
                sigma_feature[0] = boundingBoxesResults_->bounding_boxes[0].utx;
-               sigma_feature[1] = boundingBoxesResults_->bounding_boxes[0].uty;   
+               sigma_feature[1] = boundingBoxesResults_->bounding_boxes[0].uty; 
+               // boundingBoxesResults_->bounding_boxes[0].probability  
                Vector3d uav_position_lidar = -Vector3d::Identity();
                vector<Vector4d> line_ij;
                
@@ -743,8 +744,13 @@ void Yolo_Update(){
                          //for visualization   not rected pose
                          feat_point[0] = project_uav.x()/project_uav.z();
                          feat_point[1] = project_uav.y()/project_uav.z();
-                         m_feature.unlock();
                          ifdetection = 1;
+                         rect_left = cv::Point2d(boundingBoxesResults_->bounding_boxes[0].xmin, boundingBoxesResults_->bounding_boxes[0].ymin);
+                         rect_right = cv::Point2d(boundingBoxesResults_->bounding_boxes[0].xmax, boundingBoxesResults_->bounding_boxes[0].ymax);
+                         uncertainty_yolo = boundingBoxesResults_->bounding_boxes[0].probability;
+                         plot_box = 1;
+                         m_feature.unlock();
+                         
                          continue;
                     }
 
@@ -811,12 +817,26 @@ void Yolo_Update(){
                     Eigen::Vector3d y, z_k;
                     Eigen::Matrix3d  S, K;
                     z_k = p_f_L; //output from yolov3
+
+                    //data record
+                    //
+                    geometry_msgs::PointStamped p_u;
+                    Vector3d z_cam = (R_cam_lidar*z_k + t_cam_lidar);// uav's position in camera frame
+                    Vector3d z_b = R_cam_imu.inverse()*z_cam - R_cam_imu.inverse()*t_cam_imu;
+                    z_b = q_drone*z_b + p_drone;//world frame
+                    p_u.point.x = z_b.x();
+                    p_u.point.y = z_b.y();
+                    p_u.point.z = z_b.z();
+                    yolo_update.publish(p_u);
+
+
+
                     
                     /********/
                     Q_variance<<
-                              0.25, 0, 0,
-                              0, 0.01, 0,
-                              0, 0, 0.01;
+                              Q_x, 0, 0,
+                              0, Q_y, 0,
+                              0, 0, Q_z;
                     // Matrix3d f1,sigma_yolo_x;
                     Matrix2d sigma_yolo_x;
                     MatrixXd f1(3,2);
@@ -831,10 +851,11 @@ void Yolo_Update(){
                                    sigma_feature[0], 0,
                                    0, sigma_feature[1];
                     Q_variance = R_cam_lidar.transpose()*f1*sigma_yolo_x*f1.transpose()*R_cam_lidar + Q_variance;
-                    // ROS_DEBUG_STREAM("Q_variance = "<<endl<<Q_variance.matrix());
-                    // ROS_DEBUG_STREAM("sigma_feature = "<< sigma_feature[0]<<", "<<sigma_feature[1]);
+                    ROS_INFO_STREAM("Q_variance = "<<endl<<Q_variance.matrix());
+                    ROS_INFO_STREAM("sigma_feature = "<< sigma_feature[0]<<", "<<sigma_feature[1]);
                     /*********/
                     y = z_k - C_T*x_k_k;   //nonlinear
+                    
                     S=C_T*P_k_k*C_T.transpose() + Q_variance; //observation
                     // S = 0.01*eye3;
                     K = P_k_k*C_T.transpose()*S.inverse();
@@ -843,7 +864,9 @@ void Yolo_Update(){
 
                     /*update*/   
                     x_k_k = x_k_k + K*y;
+                    ROS_INFO_STREAM("P_K_K = "<<endl<<P_k_k.matrix());
                     P_k_k=I_KH*P_k_k*I_KH.transpose() + K*Q_variance*K.transpose();
+                    ROS_INFO_STREAM("update P_K_K = "<<endl<<P_k_k.matrix());
                     m_ekf.unlock();
 
                     Vector3d p_cam = (R_cam_lidar*x_k_k + t_cam_lidar);// uav's position in camera frame
@@ -852,6 +875,13 @@ void Yolo_Update(){
                     m_feature.lock();
                     feat_point[0] = project_uav.x()/project_uav.z();
                     feat_point[1] = project_uav.y()/project_uav.z();
+                    rect_left = cv::Point2d(boundingBoxesResults_->bounding_boxes[0].xmin, boundingBoxesResults_->bounding_boxes[0].ymin);
+                    rect_right = cv::Point2d(boundingBoxesResults_->bounding_boxes[0].xmax, boundingBoxesResults_->bounding_boxes[0].ymax);
+                    uncertainty_yolo = boundingBoxesResults_->bounding_boxes[0].probability;
+                    plot_box = 1;
+
+
+
                     m_feature.unlock();
                     //p_b and t_bc is virtual setting in HILS, need apply R_cam_imu and t_cam_imu in real fly.
                     // Vector3d p_b = q_bc*p_cam+t_bc;//uav's position in body frame
@@ -863,6 +893,7 @@ void Yolo_Update(){
                     p_box.point.z = p_b.z();
                     ROS_DEBUG_STREAM("yolo_depth_update = "<<x_k_k.x()<<", "<<x_k_k.y()<<", "<<x_k_k.z());
                     v_ekf.publish(p_box);
+                    
                     
                     ROS_DEBUG_STREAM("update time : "<<t_update.toc()<<" ms");
                     ave_ekf_update = (ave_ekf_update*(k_n-1) + t_update.toc())/k_n;
@@ -890,7 +921,7 @@ int main(int argc, char **argv)
 {
      ros::init(argc, argv, "pc_preprocessing");
      ros::NodeHandle n("~");
-     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
+     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
      ros::Subscriber subpc = n.subscribe("/livox/lidar", 20, pc2Callback);
      ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1, imgCallback);
      ros::Subscriber subpos = n.subscribe("/mavros/local_position/pose", 100, poseCallback);
@@ -901,6 +932,7 @@ int main(int argc, char **argv)
      pubimg = n.advertise<sensor_msgs::Image>("/camera/rgb/image_raw",  10);
      pubimg_upsample = n.advertise<sensor_msgs::Image>("/camera/xyz/image_upsampling",  10);
      v_ekf = n.advertise<geometry_msgs::PointStamped>("/vekf",100);
+     yolo_update = n.advertise<geometry_msgs::PointStamped>("/yolo_update",100);
      K_in<<
         264.0, 0, 343.76,
         0, 263.7, 183.8795,
@@ -983,6 +1015,13 @@ int main(int argc, char **argv)
      ROS_INFO_STREAM("resolution_cmp: "<<resolution_cmp);
      fsSettings["original_cmp"]>>original_cmp;
      ROS_INFO_STREAM("original_cmp: "<<original_cmp);
+     fsSettings["Q_x"]>>Q_x;
+     fsSettings["Q_y"]>>Q_y;
+     fsSettings["Q_z"]>>Q_z;
+     
+     ROS_INFO_STREAM("Q: "<<Q_x<<", "<<Q_y<<", "<<Q_z);
+     fsSettings["cox"]>>cox;
+     ROS_INFO_STREAM("cox: "<<cox);
 
      std::thread prepro_pc = std::thread(&Preprocess);
      std::thread yolo_update = std::thread(&Yolo_Update);

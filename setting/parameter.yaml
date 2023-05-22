@@ -6,13 +6,17 @@ n_split: 10 #split [0,1) into n_split part
 
 
 image_save: 0
-visualization: 0
 show_image: 1
-compare_rect: 0
-compare_upsampling: 0
+compare_rect: 1 #比较运动补偿
+compare_upsampling: 0 #比较有无离散化的效果
 first_loop: 0
 time_compare: 1
-resolution_cmp: 0
-original_cmp: 0
-n_skip: 3
+resolution_cmp: 0 #比较不同分辨率的离散化
+original_cmp: 0  #比较[[28]中的方法（无任何加速）
+n_skip: 2
 
+
+Q_x: 0.25
+Q_y: 0.1
+Q_z: 0.1
+cox: 1.0

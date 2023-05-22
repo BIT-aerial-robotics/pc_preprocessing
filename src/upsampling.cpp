@@ -934,8 +934,8 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         
         char png_name_upsampling[200];
         char png_name[200];
-        sprintf(png_name_upsampling, "/media/mao/PortableSSD/Dataset/mpc_dataset/dataset_20230201_lowlight/%05dimg_b_2.png", i_pc_count);
-        sprintf(png_name, "/media/mao/PortableSSD/Dataset/mpc_dataset/dataset_20230201_lowlight/%05dimg_b.png", i_pc_count);
+        sprintf(png_name_upsampling, "/media/mao/PortableSSD/Dataset/mpc_dataset/dataset_20230519/%05dimg_x_2.png", i_pc_count);
+        sprintf(png_name, "/media/mao/PortableSSD/Dataset/mpc_dataset/dataset_20230519/%05dimg_x.png", i_pc_count);
         i_pc_count ++;
         
         //cv::cvtColor(image_upsample, image_upsample_grey, cv::COLOR_BGR2GRAY);
@@ -944,7 +944,7 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         //cv::imshow("image_upsample", image_upsample);
         //cv::namedWindow("image", cv::WINDOW_NORMAL);
         //cv::imshow("image", img_cur);
-        cv::imwrite(png_name_upsampling, image_upsample); //save the image
+        cv::imwrite(png_name_upsampling, image_upsample_original); //save the image
         cv::imwrite(png_name, img_cur); 
         //cv::waitKey(1);
         // cv::Mat channel[3];
@@ -1019,10 +1019,25 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       cv_bridge::CvImagePtr cv_ptr;
       cv_ptr = cv_bridge::toCvCopy(imgrgb_cur, sensor_msgs::image_encodings::BGR8);
       img_cur  = cv_ptr -> image;
-      cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-      cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
-      cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
-      cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      
+      m_feature.lock();
+      if(ifdetection){
+        cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+        cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+      }
+      if(plot_box){
+        cv::rectangle(image_upsample, rect_left, rect_right, cv::Scalar(255, 0, 255), 2);
+        cv::rectangle(img_cur, rect_left, rect_right, cv::Scalar(255, 0, 255), 2);
+        char text[10];
+        sprintf(text, "%.1f %", uncertainty_yolo*100);
+        rect_left.y = rect_left.y-5;
+        cv::putText(image_upsample, text, rect_left, cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.5, cv::Scalar(255, 0, 255), 1);
+        cv::putText(img_cur, text, rect_left, cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.5, cv::Scalar(255, 0, 255), 1);
+        plot_box = 0;
+      }
+      m_feature.unlock();
+      // cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      // cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
       cv::imshow("XYZ_resolution_0.1", image_upsample);
       cv::imshow("RGB", img_cur);
       cv::waitKey(1);

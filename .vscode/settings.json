@@ -76,5 +76,12 @@
         "*.ipp": "cpp",
         "*.txx": "cpp"
     },
-    "C_Cpp.errorSquiggles": "enabled"
+    "C_Cpp.errorSquiggles": "enabled",
+    "python.analysis.extraPaths": [
+        "/home/mao/AirSim/ros/devel/lib/python2.7/dist-packages",
+        "/home/mao/yolo/devel/lib/python2.7/dist-packages",
+        "/home/mao/reinforce/devel/lib/python2.7/dist-packages",
+        "/home/mao/zed-ros/devel/lib/python2.7/dist-packages",
+        "/opt/ros/melodic/lib/python2.7/dist-packages"
+    ]
 }

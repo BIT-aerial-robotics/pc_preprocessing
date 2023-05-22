@@ -73,9 +73,9 @@ namespace plt = matplotlibcpp;
 int w_img = 672, h_img = 376, c_img =3;
 
  
-const int original_freq = 100;
-const int cur_freq = 100;
-const int WINDOW_SIZE = 40;//0.4s*original_freq
+const int original_freq = 10;
+const int cur_freq = 10;
+const int WINDOW_SIZE = 4;//0.4s*original_freq
 const int Add_n = original_freq/cur_freq;
 int cur_add_n = 1;
 Matrix3d R_cam_lidar, K_in;
@@ -478,6 +478,8 @@ vector<pointcoordinate> pc_array_feature; //put the feature points in the array
 
 /***********************************************/
 //efk
+double Q_x, Q_y, Q_z;
+double cox;
 //feat_point
 double u0;
 double v0;
@@ -504,16 +506,20 @@ long long last_yolo_timestamp = 0;
 Vector2d box_center_in_image;
 cv::Point2d circle_center;//visualization 
 cv::Point2d rect_circle_center;
+cv::Point2d rect_left;
+cv::Point2d rect_right;
+double uncertainty_yolo;
 vector<cv::Point2d> box_grid_points;
 /*************************************************/
 
 ros::Publisher pubimg;
 ros::Publisher pubimg_upsample;
-ros::Publisher v_ekf;
+ros::Publisher v_ekf, yolo_update;
 sensor_msgs::ImageConstPtr imgrgb;
 sensor_msgs::ImageConstPtr imgrgb_cur;
 float sigma_feature[2]={0,0}; //the uncertainty of feature in pixel frame
 int ifdetection = 0 ;
+int plot_box = 0;
 Quaterniond q_bc = Quaterniond(-0.5, 0.5, -0.5, 0.5);
 Vector3d t_bc = Vector3d::Zero();
 
@@ -523,9 +529,9 @@ Eigen::MatrixXd T_pc_ima(4,4);
 Eigen::MatrixXd T_cam_lidar(4,4);
 pthread_t tids[4];
 //points clond threshold
-double x_threshold = 30;
-double y_threshold = 20;
-double z_threshold = 20;
+double x_threshold = 100;
+double y_threshold = 50;
+double z_threshold = 50;
 
 //save image for train
 int image_save;
@@ -668,9 +674,13 @@ void Preprocess(){
                 pc_time_last = pc_time_cur;
                 pc_time_cur = pc_manager.pc_win_buffer[sum_pc_i]->header.stamp.toSec();
                 //时间出现跳变，需要重置
+                // ROS_INFO_STREAM("pc_time_cur-pc_time_last = "<<pc_time_cur-pc_time_last);
+                
                 if((pc_time_cur-pc_time_last>1.0 || pc_time_cur < pc_time_last) && pc_time_last != 0
                         || !pc_manager.maskn.malloc_ok || !pc_manager.mask_no_rect.malloc_ok){
+                            //
                     pc_manager.reset_init();
+
                     pc_first_call = true;
                     flag_int_xkk = 0;
                     flag_int_xkk_last = 0;
@@ -685,7 +695,7 @@ void Preprocess(){
                     continue;
                 }
                 /*end: check timestamp***********************************************************/
-                //
+                
                 int i_buffer = 0;
                 while(!pc_buffer.empty()){        
                     if(i_buffer != sum_pc_i){
@@ -1388,8 +1398,8 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
     rect_uav_pos_world = K_in*(R_cam_imu*(q_drone_cur.inverse()*rect_uav_pos_world - q_drone_cur.inverse()*p_drone_cur) + t_cam_imu);
     circle_center = cv::Point2d(feat_point[0],feat_point[1]);
     rect_circle_center = cv::Point2d(rect_uav_pos_world.x()/rect_uav_pos_world.z(), rect_uav_pos_world.y()/rect_uav_pos_world.z());
-    u0 = feat_point[0];
-    v0 = feat_point[1];
+    // u0 = feat_point[0];
+    // v0 = feat_point[1];
     m_feature.unlock();
     if(pc_buffer_size == WINDOW_SIZE){
         pc_manager.set_init();
