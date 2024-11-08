@@ -25,7 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-
+#include <random>
 #include "imageBasics.h"
 //计算平面内两点之间的距离
 float squareDistance(point a, point b)
@@ -168,9 +168,54 @@ void DBSCAN(vector<point> &dataset, float Eps, int MinPts)
 //      return threadsstruct;
 // }
 
-
+// void airsim_gt_cal(const nav_msgs::Odometry::ConstPtr& msg){
+// 	if(first_call_gt){
+// 		original_gt_x = msg->pose.pose.position.x;
+// 		original_gt_y = msg->pose.pose.position.y;
+// 		original_gt_z = msg->pose.pose.position.z;
+// 		first_call_gt = false;
+// 	}
+// 	target_pose = true;
+// 	yolo_sim = true;
+// 	q_gt = Quaterniond(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
+// 	//ROS_INFO_STREAM("R = "<<"\n"<<q_gt.toRotationMatrix().matrix());
+// 	q_gt = q_gt*R_FRD_FLU;//机体坐标系从前右下转 到 前左上
+// 	//ROS_INFO_STREAM("R = "<<"\n"<<q_gt.toRotationMatrix().matrix()); 
+// 	t_gt = Vector3d(msg->pose.pose.position.x - original_gt_x, msg->pose.pose.position.y - original_gt_y, msg->pose.pose.position.z - original_gt_z);
+// 	//ROS_INFO_STREAM("p = "<<t_gt.matrix());
+// 	Eigen::Vector3d target_w_enu = Vector3d(uav_target_x, uav_target_y, uav_target_z);
+// 	//ROS_INFO_STREAM("target in enu = ("<<target_w_enu.x()<<", "<<target_w_enu.y()<<", "<<target_w_enu.z()<<")");
+// 	Eigen::Vector3d target_w_ned =  R_ned_enu*target_w_enu;
+// 	//ROS_INFO_STREAM("target in ned = ("<<target_w_ned.x()<<", "<<target_w_ned.y()<<", "<<target_w_ned.z()<<")");
+// 	Eigen::Vector3d target_body = (q_gt.inverse()*target_w_ned - q_gt.inverse()*t_gt);
+// 	//ROS_INFO_STREAM("target in body = ("<<target_body.x()<<", "<<target_body.y()<<", "<<target_body.z()<<")");
+// 	//todo:验证下面的坐标系
+// 	//ROS_INFO_STREAM("R_bc = "<<"\n"<<q_bc.toRotationMatrix().matrix());
+// 	Eigen::Vector3d target_nomalized_cam = q_bc.inverse()*target_body -q_bc.inverse()*p_bc;
+// 	//ROS_INFO_STREAM("target in cam = ("<<target_nomalized_cam.x()<<", "<<target_nomalized_cam.y()<<", "<<target_nomalized_cam.z()<<")");
+// 	u_v_1 = KR_cb*target_body + Kt_cb;
+// 	u_v_1 = u_v_1/u_v_1.z();
+// 	//if()
+// 	//ROS_INFO_STREAM("(u, v) = ("<<u_v_1.x()<<", "<<u_v_1.y()<<")" );
+//  	u_v_1_n = u_v_1 + Vector3d(dist(generator), dist(generator), 0);
+// 	//ROS_INFO_STREAM("noise (u, v) = ("<<u_v_1_n.x()<<", "<<u_v_1_n.y()<<")" );
+// }
+Vector3d t_p = Vector3d::Zero();//target point
+Vector3d rect_uav_pose_lidar;
+int start_state = 1;
+Vector3d original_position;
+int update_n_1 = 0;
+bool is_update = false;
+queue<Vector3d> p_que;
+queue<Quaterniond>q_que;
+Quaterniond q_drone_1;
+Vector3d p_drone_1;
+std::default_random_engine generator;
+std::normal_distribution<double> distribution(0.0, 0.05);
+int add_ = 0;
 void poseCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg)
 {
+     update_n_1++;
      TicToc pose_callback_t;
      geometry_msgs::PoseStamped posek;
 
@@ -178,42 +223,80 @@ void poseCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg)
      //pose_series.push(posek);
 	// pose_global.pose = msg->pose;
      //pose_global = *msg;
-     m_state.lock();
+ 
      p_drone = Vector3d(posek.pose.position. x,posek.pose.position.y, posek.pose.position.z );
      q_drone = Quaterniond(posek.pose.orientation.w, posek.pose.orientation.x, posek.pose.orientation.y, posek.pose.orientation.z);
-     m_state.unlock();
+     p_que.push(p_drone);
+     q_que.push(q_drone);
+     while(p_que.size()>300){
+          p_que.pop();
+          q_que.pop();
+     }
+     // ROS_INFO_STREAM("size = "<<p_que.size());
      pose_timestamp = posek.header.stamp.toNSec();
-     // ROS_INFO_STREAM("pose callback time = "<<pose_callback_t.toc()<< " ms");
+     if(start_state == 1){
+          start_state = 2;
+          original_position = p_drone;
+     }
+     add_ ++;
+     t_p = original_position + Vector3d{0+2*sin(add_*2*3.14/1000.0),5,1.5};//in the world frame
+     geometry_msgs::PointStamped p0;
+     p0.point.x = t_p.x();
+     p0.point.y = t_p.y();
+     p0.point.z = t_p.z();
+     v_ekf0.publish(p0);
+     if(update_n_1>=5 && p_que.size()==300)
+     {
+          q_drone_1 = q_que.front();
+          p_drone_1 = p_que.front();
+          Vector3d p_12 = q_drone_1.inverse()*(p_drone - p_drone_1);
+          Quaterniond q_12 = q_drone_1.inverse()*q_drone;
+          Vector3d p_b = q_drone_1.inverse()*(t_p - p_drone_1) + Vector3d(distribution(generator), distribution(generator), distribution(generator));// in the body frame
+
+          Vector3d p_b_cur = q_12.inverse()*(p_b - p_12);
+          Vector3d p_t_cur = q_drone*p_b_cur + p_drone;
+
+          Vector3d p_cam = R_cam_imu*p_b;//in camera frame
+          rect_uav_pose_lidar = R_cam_lidar.transpose()*p_cam; // in the camera frame
+
+          update_n_1 = 0;
+          is_update = true;
+          //interested point in the world frame 
+          geometry_msgs::PointStamped p_box;
+          p_box.point.x = t_p.x();
+          p_box.point.y = t_p.y();
+          p_box.point.z = t_p.z();
+          v_ekf2.publish(p_box);
+          // ROS_INFO("publish");
+          
+          
+         
+          if(start_state == 2){
+               start_state = 3;
+               x_k_k = rect_uav_pose_lidar;
+          }
+     }
 }
 
 double t_v_last = 0;
 double t_v_cur = 0;
 bool first_msg = true;
+
+int update_n = 0;
+
 void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
 {    
-     TicToc t_predict;
-     // ROS_DEBUG_STREAM("velcallback");
+     update_n++;
      geometry_msgs::TwistStamped velk;
      velk = *msg;
      t_v_last = t_v_cur;
      t_v_cur = velk.header.stamp.toSec();
-     if(first_msg){
-          first_msg = false;
+     if(start_state <=2){
           return;
      }
-     //int grid_ave = 50;
-     
-     int sum_no = 0; // the total points near the feature point
-     //ekf predict part
+     ifdetection = 1;
      if(ifdetection == 1){
-          //initialization flags
-          flag_int_xkk_last = flag_int_xkk;
-          flag_int_xkk = 1;
-          //initial state
-          if ((flag_int_xkk_last == 0) & (flag_int_xkk == 1)){
-               x_k_k = p_f_L;  //initialization of the variable in kalman filter
-          }
-          if (flag_int_xkk == 1){               
+          if (1){               
                Eigen::Vector3d omega_s,  v_s; //angular velocity of the sensor relative to earth, and the velocity relative to earth
                double deltat = t_v_cur - t_v_last;  //sampling time
                // ROS_INFO_STREAM("dt = "<<deltat);
@@ -226,15 +309,6 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
                               omega_s(2), 0, -omega_s(0),
                               -omega_s(1), omega_s(0), 0;
                
-               // R_variance  << 0, 0, 0, 0, 0, 0,
-               //                0, 0, 0, 0, 0, 0,
-               //                0, 0, 0, 0, 0, 0,
-               //                0, 0, 0, 0, 0, 0,
-               //                0, 0, 0, 0, 0, 0,
-               //                0, 0, 0, 0, 0, 0;
-               
-               //need to be adjusted
-               
                R_variance  << cox, 0, 0, 0, 0, 0,
                               0, cox, 0, 0, 0, 0,
                               0, 0, cox, 0, 0, 0,
@@ -242,7 +316,7 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
                               0, 0, 0, 0, cox, 0,
                               0, 0, 0, 0, 0, cox;
                
-               m_ekf.lock();
+         
                Eigen::Matrix3d p_hat(3,3);
                p_hat << 0, -x_k_k(2), x_k_k(1),
                          x_k_k(2), 0, -x_k_k(0),
@@ -257,34 +331,55 @@ void velCallback(const  geometry_msgs::TwistStamped::ConstPtr& msg)
                u_k << omega_s, v_s;
                //x_k_k = G_T*x_k_k + H_T* u_k;  //linear
                x_k_k = deltat*(x_k_k.cross(omega_s) - v_s) + x_k_k;  //non-linear    预测的部分   速度和角速度用的是local_velocity_body   x_k_k is uav's position in lidar frame
-               P_k_k = G_T*P_k_k*G_T.transpose() + H_T*R_variance*H_T.transpose();
-               m_ekf.unlock();
+               P_k_k = G_T*P_k_k*G_T.transpose() + H_T*R_variance*H_T.transpose();   
                
-               Vector3d p_cam = (R_cam_lidar*x_k_k + t_cam_lidar);// uav's position in camera frame
-               Vector3d project_uav = K_in*p_cam;
-               //update featur_point
-               // ROS_INFO("update featur_point");
-               m_feature.lock();
-               feat_point[0] = project_uav.x()/project_uav.z();
-               feat_point[1] = project_uav.y()/project_uav.z();
-               m_feature.unlock();
-               //p_b and t_bc is virtual setting in HILS, need apply R_cam_imu and t_cam_imu in real fly.
-               // Vector3d p_b = q_bc*p_cam+t_bc;//uav's position in body frame
-               Vector3d p_b = R_cam_imu.inverse()*p_cam - R_cam_imu.inverse()*t_cam_imu;//uav's position in body frame
-               p_b = q_drone*p_b + p_drone;//world frame
-               geometry_msgs::PointStamped p_box;
-               p_box.point.x = p_b.x();
-               p_box.point.y = p_b.y();
-               p_box.point.z = p_b.z();
-               // ROS_INFO_STREAM("yolo_depth_predict = "<<x_k_k.x()<<", "<<x_k_k.y()<<", "<<x_k_k.z());
-               v_ekf.publish(p_box);
           }
+          //update
+          if(is_update){
+               is_update = false;
+               p_f_L = rect_uav_pose_lidar;//bo rect
+               Eigen::Vector3d y, z_k;
+               Eigen::Matrix3d  S, K;
+               z_k = p_f_L; //output from yolov3
+          
+               /*calculate uncertainty*/
+               Q_variance<<
+                         Q_x, 0, 0,
+                         0, Q_y, 0,
+                         0, 0, Q_z;
+               // Matrix3d f1,sigma_yolo_x;
+               
+               y = z_k - C_T*x_k_k;   //nonlinear
+               
+               S=C_T*P_k_k*C_T.transpose() + Q_variance; //observation
+               // S = 0.01*eye3;
+               K = P_k_k*C_T.transpose()*S.inverse();
+               // K = 0.1*eye3;
+               MatrixXd I_KH = (eye3 -K*C_T); 
+
+               /*update*/   
+               x_k_k = x_k_k + K*y;
+               ROS_INFO_STREAM("P_K_K = "<<endl<<P_k_k.matrix());
+               P_k_k=I_KH*P_k_k*I_KH.transpose() + K*Q_variance*K.transpose();
+               ROS_INFO_STREAM("update P_K_K = "<<endl<<P_k_k.matrix());
+
+
+          }
+
+          Vector3d p_cam = (R_cam_lidar*x_k_k + t_cam_lidar);// uav's position in camera frame     
+          Vector3d p_b = R_cam_imu.inverse()*p_cam - R_cam_imu.inverse()*t_cam_imu;//uav's position in body frame
+          p_b = q_drone*p_b + p_drone;//world frame
+          geometry_msgs::PointStamped p_box;
+          p_box.point.x = p_b.x();
+          p_box.point.y = p_b.y();
+          p_box.point.z = p_b.z();
+          ROS_INFO_STREAM("W_target_poistion_update = "<<p_b.x()<<", "<<p_b.y()<<", "<<p_b.z());
+          v_ekf.publish(p_box);
+               
+
+          
           
      }
-     j_n++;
-     // ROS_INFO_STREAM("vekf predict: "<<t_predict.toc()<<" ms");
-     ave_ekf_predict = (ave_ekf_predict*(j_n-1) + t_predict.toc())/j_n;
-     // ROS_INFO_STREAM("average vekf predict: "<<ave_ekf_predict<<" ms\n");
 }
 
 void detectCallback(const  darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
@@ -714,37 +809,39 @@ void Yolo_Update(){
                     Matrix3d R_lidar0_lidar = R_imu_lidar.inverse()*R_b0_lidar;
                     Vector3d t_lidar0_lidar = R_imu_lidar.inverse()*(t_b0_lidar)-R_imu_lidar.inverse()*t_imu_lidar;
 
-
-
-
-
-
-                    
+                    //unrected
                     Vector3d uav_pose_body = R_imu_lidar*uav_position_lidar + t_imu_lidar;
-                    Vector3d uav_pose_world = yolo_cur_pc_data.q_wb*uav_pose_body + yolo_cur_pc_data.t_wb;
-                    // Vector3d rect_uav_pose_body = q_drone_now.inverse()*uav_pose_world - q_drone_now*p_drone_now;//rected with current uav's pose
-                    // Vector3d uav_position_incamframe_rect = R_cam_imu*uav_pose_bodyframe + t_cam_imu;//rected uav position in camera frame
+                    Vector3d uav_position_incam = R_cam_imu*uav_pose_body + t_cam_imu;                  
+                    Vector3d project_uav = K_in*uav_position_incam;
+                    //rected
                     Vector3d rect_uav_pose_lidar = R_lidar0_lidar*uav_position_lidar + t_lidar0_lidar;//rected uav position in lidar frame
-                    // Vector3d rect_project_uav = K_in*uav_position_incamframe_rect;
                     Vector3d rect_uav_pose_cam = R_cam_lidar*rect_uav_pose_lidar + t_cam_lidar;
-                    ROS_INFO_STREAM("rect_uav_pose_lidar = "<<rect_uav_pose_lidar.x()<<", "<<rect_uav_pose_lidar.y()<<", "<<rect_uav_pose_lidar.z());
+                    Vector3d rect_project_uav = K_in*rect_uav_pose_cam;
                     //for visualization 
-                    rect_feat_point[0] = uav_pose_world.x();//因为不知道下一帧pc的时间戳，所以在pc收到的时候在转到pc对应的lidar系下
-                    rect_feat_point[1] = uav_pose_world.y();
-                    rect_feat_point[2] = uav_pose_world.z();
+                   
+                    m_feature.lock();
+                    unrect_feat_point[0] = project_uav.x()/project_uav.z();
+                    unrect_feat_point[1] = project_uav.y()/project_uav.z();
+                    rect_feat_point[0] = rect_project_uav.x()/rect_project_uav.z();
+                    rect_feat_point[1] = rect_project_uav.y()/rect_project_uav.z();
+                    get_yolo_update = 1;
+                    m_feature.unlock();
                     
                     //初始化阶段
                     if(flag_int_xkk == 0){
                          ROS_INFO("initialization!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                          // flag_int_xkk = 1;//for test
                          p_f_L = rect_uav_pose_lidar;//initial value for vekf
+                         
                          //update feature point        
-                         Vector3d project_uav = K_in*rect_uav_pose_lidar;
+                         
                          m_feature.lock();
                          //for visualization   not rected pose
-                         feat_point[0] = project_uav.x()/project_uav.z();
-                         feat_point[1] = project_uav.y()/project_uav.z();
+                         feat_point[0] = rect_project_uav.x()/rect_project_uav.z();
+                         feat_point[1] = rect_project_uav.y()/rect_project_uav.z();
+                         
                          ifdetection = 1;
+                         
                          rect_left = cv::Point2d(boundingBoxesResults_->bounding_boxes[0].xmin, boundingBoxesResults_->bounding_boxes[0].ymin);
                          rect_right = cv::Point2d(boundingBoxesResults_->bounding_boxes[0].xmax, boundingBoxesResults_->bounding_boxes[0].ymax);
                          uncertainty_yolo = boundingBoxesResults_->bounding_boxes[0].probability;
@@ -760,66 +857,12 @@ void Yolo_Update(){
                     /**************************************************************/
                     //ekf update part
                     m_ekf.lock();
-                    // double x_f_l = rect_uav_pose_lidar.x();//no rect
-
-                    // Eigen::Matrix3d fp_tra(3,3);   //see notebook
-                    // fp_tra = -R_cam_lidar;
-                    // Vector3d tmp = Vector3d((feat_point[0]-343.76)/264, (feat_point[1] -183.8795)/263.70, 1.0);
-                    // fp_tra.block<3,1>(0,0) =tmp;
-                    // // ROS_INFO_STREAM("fp_tra = \n"<<fp_tra.matrix());
-                    
-                    // Eigen::Vector3d fp_vec(3);
-                    // Eigen::Vector3d r1(3);
-                    // r1 = R_cam_lidar.block<3,1>(0,0);
-                    
-                    // Eigen::Vector3d t_c_L = t_cam_lidar;
-                    // fp_vec = x_f_l*r1 + t_c_L;
-                    // Eigen::Vector3d v_mi;
-                    // v_mi = fp_tra.inverse()*fp_vec;//求解的【cz，y，z】
-                    // double z_f_c = v_mi(0);//相机坐标系下的深度值
-                    // double x_f_c = (feat_point[0] - 343.76)* z_f_c /264;//
-                    // double y_f_c = (feat_point[1] - 183.8795)* z_f_c /263.700;
-                    
-                    // // p_f_L << x_f_l, v_mi(1), v_mi(2);//雷达系下的目标位置
-                    // // ROS_INFO_STREAM("yolo_scbb = "<<p_f_L.x()<<", "<<p_f_L.y()<<", "<<p_f_L.z());
                     p_f_L = rect_uav_pose_lidar;//bo rect
-                    
-
-                    // //the jacobian matrix for covariance calculation
-                    // Eigen::Matrix3d pApu, pApv;
-                    // pApu <<   1/fx, 0, 0,
-                    //           0, 0, 0,
-                    //           0, 0, 0;
-                    // pApv <<   0, 0, 0,
-                    //           1/fy, 0, 0,
-                    //           0, 0, 0;
-                    // Eigen::Vector3d pfpuvx1 =  -fp_tra.inverse()*pApu*fp_tra.inverse()*fp_vec;
-                    // Eigen::Vector3d pfpuvx2 =  -fp_tra.inverse()*pApv*fp_tra.inverse()*fp_vec;
-                    // Eigen::Vector3d pfpuvx3 =  -fp_tra.inverse()*(r1 + t_cam_lidar);
-                    // Eigen::Matrix3d pfpuvx;
-                    // pfpuvx << pfpuvx1,pfpuvx2, pfpuvx3;
-
-                    // Eigen::MatrixXd pfpuvx23row(2,3);
-                    // pfpuvx23row = pfpuvx.block<2,3>(1,0);
-
-                    // Eigen::Matrix3d vari_pix_z;
-                    // vari_pix_z <<  0.1, 0, 0,
-                    //                0, sigma_feature[0], 0,
-                    //                0, 0, sigma_feature[1];  //from the yoloros, the uncertainty
-                    // // else
-                    // //      vari_pix_z << 0.1, 0, 0,
-                    // //                          0, 0.18, 0,
-                    // //                          0, 0, 0.18;  //from the yoloros, the uncertainty为什么没有观测的时候也做更新？？？？
-
-                    // Q_variance(0,0) = 0.1;  //the variance of x component.
-                    // Q_variance.block<2,2>(1,1) = pfpuvx23row*vari_pix_z*pfpuvx23row.adjoint();
-                    // // cout << "Q_variance" << Q_variance << endl;
                     Eigen::Vector3d y, z_k;
                     Eigen::Matrix3d  S, K;
                     z_k = p_f_L; //output from yolov3
 
                     //data record
-                    //
                     geometry_msgs::PointStamped p_u;
                     Vector3d z_cam = (R_cam_lidar*z_k + t_cam_lidar);// uav's position in camera frame
                     Vector3d z_b = R_cam_imu.inverse()*z_cam - R_cam_imu.inverse()*t_cam_imu;
@@ -828,11 +871,19 @@ void Yolo_Update(){
                     p_u.point.y = z_b.y();
                     p_u.point.z = z_b.z();
                     yolo_update.publish(p_u);
+                    //unrected
+                    z_cam = (R_cam_lidar*uav_position_lidar + t_cam_lidar);// uav's position in camera frame
+                    z_b = R_cam_imu.inverse()*z_cam - R_cam_imu.inverse()*t_cam_imu;
+                    z_b = q_drone*z_b + p_drone;//world frame
+                    p_u.point.x = z_b.x();
+                    p_u.point.y = z_b.y();
+                    p_u.point.z = z_b.z();
+                    yolo_update_unrect.publish(p_u);
 
 
 
                     
-                    /********/
+                    /*calculate uncertainty*/
                     Q_variance<<
                               Q_x, 0, 0,
                               0, Q_y, 0,
@@ -870,11 +921,11 @@ void Yolo_Update(){
                     m_ekf.unlock();
 
                     Vector3d p_cam = (R_cam_lidar*x_k_k + t_cam_lidar);// uav's position in camera frame
-                    Vector3d project_uav = K_in*p_cam;
+                    rect_project_uav = K_in*p_cam;
                     //update featur_point
                     m_feature.lock();
-                    feat_point[0] = project_uav.x()/project_uav.z();
-                    feat_point[1] = project_uav.y()/project_uav.z();
+                    feat_point[0] = rect_project_uav.x()/rect_project_uav.z();
+                    feat_point[1] = rect_project_uav.y()/rect_project_uav.z();
                     rect_left = cv::Point2d(boundingBoxesResults_->bounding_boxes[0].xmin, boundingBoxesResults_->bounding_boxes[0].ymin);
                     rect_right = cv::Point2d(boundingBoxesResults_->bounding_boxes[0].xmax, boundingBoxesResults_->bounding_boxes[0].ymax);
                     uncertainty_yolo = boundingBoxesResults_->bounding_boxes[0].probability;
@@ -891,7 +942,7 @@ void Yolo_Update(){
                     p_box.point.x = p_b.x();
                     p_box.point.y = p_b.y();
                     p_box.point.z = p_b.z();
-                    ROS_DEBUG_STREAM("yolo_depth_update = "<<x_k_k.x()<<", "<<x_k_k.y()<<", "<<x_k_k.z());
+                    ROS_INFO_STREAM("W_target_poistion_update = "<<p_b.x()<<", "<<p_b.y()<<", "<<p_b.z());
                     v_ekf.publish(p_box);
                     
                     
@@ -922,17 +973,21 @@ int main(int argc, char **argv)
      ros::init(argc, argv, "pc_preprocessing");
      ros::NodeHandle n("~");
      ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
-     ros::Subscriber subpc = n.subscribe("/livox/lidar", 20, pc2Callback);
-     ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1, imgCallback);
+     // ros::Subscriber subpc = n.subscribe("/livox/lidar", 20, pc2Callback);
+     // ros::Subscriber subimg = n.subscribe("/zed2/zed_node/left/image_rect_color", 1, imgCallback);
      ros::Subscriber subpos = n.subscribe("/mavros/local_position/pose", 100, poseCallback);
      ros::Subscriber subvel = n.subscribe("/mavros/local_position/velocity_body", 100, velCallback);
-
-     ros::Subscriber subdetection = n.subscribe("/darknet_ros/bounding_boxes", 1, detectCallback);  //dependency: darknet_ros_msgs
+     // ros::Subscriber airsim_gt_sub = n.subscribe<nav_msgs::Odometry>("/airsim_node/PX4/odom_local_ned",100,airsim_gt_cal);
+     // ros::Subscriber subdetection = n.subscribe("/darknet_ros/bounding_boxes", 1, detectCallback);  //dependency: darknet_ros_msgs
 
      pubimg = n.advertise<sensor_msgs::Image>("/camera/rgb/image_raw",  10);
      pubimg_upsample = n.advertise<sensor_msgs::Image>("/camera/xyz/image_upsampling",  10);
      v_ekf = n.advertise<geometry_msgs::PointStamped>("/vekf",100);
+     v_ekf2 = n.advertise<geometry_msgs::PointStamped>("/vekf2",100);
+     v_ekf0 = n.advertise<geometry_msgs::PointStamped>("/vekf0",100);
      yolo_update = n.advertise<geometry_msgs::PointStamped>("/yolo_update",100);
+     yolo_update_unrect = n.advertise<geometry_msgs::PointStamped>("/yolo_update_unrect",100);
+     pc_pointcloud2 = n.advertise<sensor_msgs::PointCloud2>("/livox/lidar_repub", 100);
      K_in<<
         264.0, 0, 343.76,
         0, 263.7, 183.8795,
@@ -941,15 +996,15 @@ int main(int argc, char **argv)
                     0.0293523,  -0.999117,  0.0300603,
                     -0.0142596,  -0.0304887,  -0.999433,
                     0.999467,  0.028907,  -0.015142;
-     t_cam_lidar = Vector3d(0.108313, 0.0907808, 0.384258);
+     t_cam_lidar = Vector3d(0, 0, 0);
      
      /*******************************************************/
      Matrix4d T_imu_lidar = Matrix4d::Identity();
      Matrix4d T_lidar_imu = Matrix4d::Identity();
      Matrix4d T_cam_imu = Matrix4d::Identity();
 
-     Vector3d t_Imu_Lidar = Vector3d(-0.352103, -0.057517, -0.087161);
-     t_cam_imu = Vector3d(0.05813448, -0.10000966, -0.09331424);
+     Vector3d t_Imu_Lidar = Vector3d(0, 0, 0);
+     t_cam_imu = Vector3d(0, 0, 0);
 
      //calibration results by imu-livox calibration tool
      // R_Imu_Lidar<<0.998553, -0.052115, -0.013263,
@@ -1018,13 +1073,15 @@ int main(int argc, char **argv)
      fsSettings["Q_x"]>>Q_x;
      fsSettings["Q_y"]>>Q_y;
      fsSettings["Q_z"]>>Q_z;
+     fsSettings["i_pc_count"]>>i_pc_count;
+     ROS_INFO_STREAM("i_pc_count: "<<i_pc_count);
      
      ROS_INFO_STREAM("Q: "<<Q_x<<", "<<Q_y<<", "<<Q_z);
      fsSettings["cox"]>>cox;
      ROS_INFO_STREAM("cox: "<<cox);
 
-     std::thread prepro_pc = std::thread(&Preprocess);
-     std::thread yolo_update = std::thread(&Yolo_Update);
+     // std::thread prepro_pc = std::thread(&Preprocess);
+     // std::thread yolo_update = std::thread(&Yolo_Update);
      ros::spin();
      //prepro_pc.join();
      return 0;

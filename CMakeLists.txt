@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(pc_preprocessing)
+project(pc_simulation)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -59,8 +59,8 @@ add_library(${PROJECT_NAME}_lib
 
 
 
-add_executable(pc_prep src/pc_preprocessing.cpp)
-target_link_libraries(pc_prep ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PROJECT_NAME}_lib ${PYTHON_INCLUDE_DIRS})
+add_executable(pc_sim src/pc_preprocessing.cpp)
+target_link_libraries(pc_sim ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PROJECT_NAME}_lib ${PYTHON_INCLUDE_DIRS})
 
 
 

@@ -463,16 +463,19 @@ cv::Mat img_cur;
 queue<geometry_msgs::PoseStamped>  pose_series;
 geometry_msgs::PoseStamped  pose_global;
 //drone states
-Vector3d p_drone, p_drone_cur, p_origin, p_drone_last;
+Vector3d p_drone = Vector3d::Zero(); 
+Vector3d p_drone_cur, p_origin, p_drone_last;
 long long cur_timestamp = 0;
 long long pose_timestamp = 0;
-Quaterniond q_drone, q_drone_cur, q_origin, q_drone_last;
+Quaterniond q_drone = Quaterniond(1,0,0,0);
+Quaterniond q_drone_cur, q_origin, q_drone_last;
 queue<Quaterniond> q_drone_buffer;
 queue<Vector3d> p_drone_buffer;
 //T_b0_w
 Matrix4d T_origin = Matrix4d::Identity();
 sensor_msgs::Image img1;
 double feat_point[3] = {300,150, 0}; //the feature position in the pixel frame, detected by the detector
+double unrect_feat_point[3] = {300,150, 0};
 double rect_feat_point[3] = {300,150, 0};
 vector<pointcoordinate> pc_array_feature; //put the feature points in the array
 
@@ -505,7 +508,7 @@ long long last_yolo_timestamp = 0;
 // double ave_z_last = 0;
 Vector2d box_center_in_image;
 cv::Point2d circle_center;//visualization 
-cv::Point2d rect_circle_center;
+cv::Point2d unrect_circle_center, rect_circle_center;
 cv::Point2d rect_left;
 cv::Point2d rect_right;
 double uncertainty_yolo;
@@ -514,11 +517,12 @@ vector<cv::Point2d> box_grid_points;
 
 ros::Publisher pubimg;
 ros::Publisher pubimg_upsample;
-ros::Publisher v_ekf, yolo_update;
+ros::Publisher v_ekf, v_ekf2, v_ekf0, yolo_update, yolo_update_unrect, pc_pointcloud2;
 sensor_msgs::ImageConstPtr imgrgb;
 sensor_msgs::ImageConstPtr imgrgb_cur;
 float sigma_feature[2]={0,0}; //the uncertainty of feature in pixel frame
 int ifdetection = 0 ;
+int get_yolo_update = 0;
 int plot_box = 0;
 Quaterniond q_bc = Quaterniond(-0.5, 0.5, -0.5, 0.5);
 Vector3d t_bc = Vector3d::Zero();
@@ -546,6 +550,9 @@ int time_compare;
 int original_cmp;
 int n_skip = 3;
 /******************************************/
+
+
+
 PC_Wrapper pc_manager;
 void Preprocess(){
    
@@ -771,65 +778,10 @@ void Preprocess(){
                     sum_pc_i = 0;
                     // pc_manager.set_init();
                 }
-                
-
-            
-                
-                
-
-                
-                
-
                
                 int outliner=0;
 
-                //multi thread processing
-                // Threadsstruct threadsstruct[thread_num];
-                // TicToc split_t;
-                // int span = cloud.size()/ thread_num;
-                // for(int i = 0; i<thread_num; i++){
-                    
-                //      threadsstruct[i].start_index = i*span;
-                //      threadsstruct[i].end_index = (i+1)*span;
-                //      threadsstruct[i].thread_id = i;
-                //      if(i==3){
-                //           threadsstruct[i].end_index = cloud.size();
-                //      }
-                //      //pc_i<< cloud.points[i].x, cloud.points[i].y, cloud.points[i].z, 1;
-                //      //threadsstruct[i%thread_num].pc_vector.emplace_back(cloud.points[i].x, cloud.points[i].y, cloud.points[i].z, 1);
-                //      //ROS_INFO_STREAM("point "<< threadsstruct[i%thread_num].pc_vector.back().matrix());
-                // }
-                // ROS_DEBUG_STREAM("splite time: "<<split_t.toc()<<"ms");
-
-                // TicToc thread_calculate;
-                // for(int i = 0; i<4; i++){
-                //      int ret = pthread_create( &tids[i], NULL, multi_thread_preprocess ,(void*)&(threadsstruct[i]));
-                //      if (ret != 0)
-                //      {
-                //           ROS_WARN("pthread_create error");
-                //           ROS_BREAK();
-                //      }
-                // }
-                
-
-                
-                // for( int i = thread_num - 1; i >= 0; i--)  
-                // {
-                //      pthread_join( tids[i], NULL ); 
-                //      if  (minmaxuv.umax < threadsstruct[i].minmaxuv_thread.umax) {minmaxuv.umax = threadsstruct[i].minmaxuv_thread.umax;}
-                //      if  (minmaxuv.umin > threadsstruct[i].minmaxuv_thread.umin) {minmaxuv.umin = threadsstruct[i].minmaxuv_thread.umin;}
-                //      if  (minmaxuv.vmax < threadsstruct[i].minmaxuv_thread.vmax) {minmaxuv.vmax = threadsstruct[i].minmaxuv_thread.vmax;}
-                //      if  (minmaxuv.vmin > threadsstruct[i].minmaxuv_thread.vmin) {minmaxuv.vmin = threadsstruct[i].minmaxuv_thread.vmin;}
-                //      for(int j = 0; j<4; j++){
-                //           for(int k = 0; k< pc_manager.mask_win[cur_id].pc_masks[j].size(); k++){
-                //                pc_manager.mask_win[cur_id].pc_masks_single.push_back(pc_manager.mask_win[cur_id].pc_masks[j][k]);
-                                
-                //           }
-                //           pc_manager.mask_win[cur_id].pc_masks[j].clear();
-                //      }
-                    
-                // }
-                // ROS_DEBUG_STREAM("thread calculating: "<<thread_calculate.toc()<<"ms");
+              
                 
                 
                 //single thread
@@ -860,27 +812,7 @@ void Preprocess(){
                 
                     int pc_size = pc_manager.pc_win_buffer[k]->points.size();
                     livox_ros_driver::CustomMsg::ConstPtr pc_msg = pc_manager.pc_win_buffer[k];
-                    /*********************************************************************************/
-                    //pcl
-                    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
-                    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
-                    // pcl::PointCloud<pcl::PointXYZINormal>::Ptr pl_surf (new pcl::PointCloud<pcl::PointXYZINormal>);
-                    // pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZINormal>);
-                    // pl_surf->clear();
-                    // pl_surf->reserve(pc_msg->point_num+1);
-                    // cloud_filtered->clear();
-                    // cloud_filtered->reserve(pc_msg->point_num+1);
-                    // fromROS2pcl(pl_surf, pc_msg);
-                    // pcl::StatisticalOutlierRemoval<pcl::PointXYZINormal> sor;
-                    // sor.setInputCloud (pl_surf);
-                    // sor.setMeanK (50);
-                    // sor.setStddevMulThresh (1.0);
-                    // sor.filter (*cloud_filtered);
-                    /************************************************************************************/
-
-
-                    //sort(pc_msg.points.begin(), pc_msg.points.end(), comp);
-                    //Matrix4d T_cam0_L1 =  pc_manager.mask_win[pc_manager.current_id].T_bw * pc_manager.mask_win[pc_manager.current_id].T_wb * T_imu_lidar;
+        
                     Quaterniond q_b0_b1 = pc_manager.q_wb[cur_id].inverse()*pc_manager.q_wb[k];
                     Vector3d t_b0_b1 = pc_manager.q_wb[cur_id].inverse()*(pc_manager.t_wb[k]-pc_manager.t_wb[cur_id]);
                     // ROS_INFO_STREAM("relative p = ("<<t_b0_b1.x()<<", "<<t_b0_b1.y()<<", "<<t_b0_b1.z()<<")");
@@ -896,17 +828,6 @@ void Preprocess(){
                     Matrix3d R_uv0_lidar = K_in*R_cam0_lidar;
                     Vector3d t_uv0_lidar = K_in*t_cam0_lidar;
                     Vector3d cam_offset = Vector3d(0,0,0);
-                    /*********************************************************************/
-                    // pointcoordinate zerothispoint
-                    // for(int i = 0; i<pc_size; i=i+2){
-                    //     // m_thread.lock();
-                    //     pc_manager.maskn.pc_masks_single.emplace_back(zerothispoint, grid);
-                    //     pc_vector.pc_lidar_3d.emplace_back(0,0,0);
-                    //     pc_vector.pc_uv.emplace_back(0, 0);
-                    //     // pc_vector.pc_3d_uv.emplace_back(pc_lidar.x(), pc_lidar.y(), pc_lidar.z(), pu, pv);
-                    //     // m_thread.unlock();    
-                    // }
-                    /***************************************************************/
 
 
 
@@ -958,16 +879,6 @@ void Preprocess(){
                             thispoint.v_px = pix_pc[1];
                             thispoint.t_offset = pc_msg->points[i].offset_time;
 
-                            //thispoints[i]=thispoint;
-                            //pc_array.push_back(thispoint);
-
-                            // if  (thispoint.x_3d > point_max.x) { point_max.x = thispoint.x_3d; }
-                            // if  (thispoint.y_3d > point_max.y) { point_max.y = thispoint.y_3d; }
-                            // if  (thispoint.z_3d > point_max.z) { point_max.z = thispoint.z_3d; }
-                            // if  (thispoint.x_3d < point_min.x) { point_min.x = thispoint.x_3d; }
-                            // if  (thispoint.y_3d < point_min.y) { point_min.y = thispoint.y_3d; }
-                            // if  (thispoint.z_3d < point_min.z) { point_min.z = thispoint.z_3d; }
-
                             if  (thispoint.u_px > minmaxuv.umax) {minmaxuv.umax = thispoint.u_px;}
                             if  (thispoint.u_px < minmaxuv.umin) {minmaxuv.umin = thispoint.u_px; }
                             if  (thispoint.v_px > minmaxuv.vmax) {minmaxuv.vmax = thispoint.v_px;}
@@ -984,18 +895,7 @@ void Preprocess(){
                             double dx = abs(pc_lidar.x());
                             double dy = abs(pc_lidar.y());
                             double dz = abs(pc_lidar.z());
-                            // if(dy<0.0001){
-                            // dy = 0.0001;
-                            // //ROS_INFO_STREAM("dy = "<<dy);
-                            // }
-                            // if(dx<0.0001){
-                            // dx = 0.0001;
-                            // //ROS_INFO_STREAM("dy = "<<dy);
-                            // }
-                            // if(dz<0.0001){
-                            // dz = 0.0001;
-                            // //ROS_INFO_STREAM("dy = "<<dy);
-                            // }
+
                             thispoint.Gr_x = 1.0/sqrt(dx);
                             thispoint.Gr_y = 1.0/sqrt(dy);
                             thispoint.Gr_z = 1.0/sqrt(dz);
@@ -1347,10 +1247,10 @@ void pc2Callback(const livox_ros_driver::CustomMsg::ConstPtr &pc_msg){
 
     //update feature point synchronized with pc timestamp
     // m_feature.lock();
-    // Vector3d rect_uav_pos_world = Vector3d(rect_feat_point[0], rect_feat_point[1], rect_feat_point[2]);
+    // Vector3d rect_uav_pos_world = Vector3d(unrect_feat_point[0], unrect_feat_point[1], unrect_feat_point[2]);
     // rect_uav_pos_world = K_in*(R_cam_imu*(q_drone_cur.inverse()*rect_uav_pos_world - q_drone_cur.inverse()*p_drone_cur) + t_cam_imu);
     // circle_center = cv::Point2d(feat_point[0],feat_point[1]);
-    // rect_circle_center = cv::Point2d(rect_uav_pos_world.x()/rect_uav_pos_world.z(), rect_uav_pos_world.y()/rect_uav_pos_world.z());
+    // unrect_circle_center = cv::Point2d(rect_uav_pos_world.x()/rect_uav_pos_world.z(), rect_uav_pos_world.y()/rect_uav_pos_world.z());
     // u0 = feat_point[0];
     // v0 = feat_point[1];
     // m_feature.unlock();
@@ -1361,6 +1261,22 @@ void pc2Callback(const livox_ros_driver::CustomMsg::ConstPtr &pc_msg){
         
     //ROS_INFO("push pc into puffer");
     // ROS_INFO_STREAM("PC_callback_time = "<<pc_callback_t.toc()<<" ms");
+    sensor_msgs::PointCloud2 msg;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    for (size_t i = 0; i < pc_msg->points.size(); i++)
+    {
+        pcl::PointXYZ p(pc_msg->points[i].x, pc_msg->points[i].y, pc_msg->points[i].z);
+        cloud->push_back(p);
+    }
+
+    pcl::toROSMsg(*cloud, msg);
+    // or
+    pcl::PCLPointCloud2 pcl_pc2;
+    pcl::toPCLPointCloud2(*cloud, pcl_pc2);
+    pcl_conversions::fromPCL(pcl_pc2, msg);
+    msg.header = pc_msg->header;
+    // publish
+    pc_pointcloud2.publish(msg);
 }
 long long time_img_cur = 0;
 long long time_img_last = 0;
@@ -1394,10 +1310,11 @@ void imgCallback(const  sensor_msgs::ImageConstPtr& msg)
 
     //update feature point synchronized with pc timestamp
     m_feature.lock();
-    Vector3d rect_uav_pos_world = Vector3d(rect_feat_point[0], rect_feat_point[1], rect_feat_point[2]);
-    rect_uav_pos_world = K_in*(R_cam_imu*(q_drone_cur.inverse()*rect_uav_pos_world - q_drone_cur.inverse()*p_drone_cur) + t_cam_imu);
+    // Vector3d rect_uav_pos_world = Vector3d(unrect_feat_point[0], unrect_feat_point[1], unrect_feat_point[2]);
+    // rect_uav_pos_world = K_in*(R_cam_imu*(q_drone_cur.inverse()*rect_uav_pos_world - q_drone_cur.inverse()*p_drone_cur) + t_cam_imu);
     circle_center = cv::Point2d(feat_point[0],feat_point[1]);
-    rect_circle_center = cv::Point2d(rect_uav_pos_world.x()/rect_uav_pos_world.z(), rect_uav_pos_world.y()/rect_uav_pos_world.z());
+    unrect_circle_center = cv::Point2d(unrect_feat_point[0],unrect_feat_point[1]);
+    rect_circle_center = cv::Point2d(rect_feat_point[0],rect_feat_point[1]);;
     // u0 = feat_point[0];
     // v0 = feat_point[1];
     m_feature.unlock();

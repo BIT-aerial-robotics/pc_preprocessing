@@ -384,10 +384,11 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
   //ROS_INFO_STREAM("u(max, min) = "<<minmaxuv.umax<<", "<<minmaxuv.umin);
   cv::Mat image_upsample = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0)); //initialize the mat variable according to the size of image
   cv::Mat image_upsample_no_rect = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
-  cv::Mat image_upsample_original = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
+  cv::Mat image_upsample_original = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));//smooth reordered
   cv::Mat image_upsample_1 = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
   cv::Mat image_upsample_5 = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
   cv::Mat image_time_cmp = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));
+  cv::Mat image_project = cv::Mat(h, w, CV_8UC3, cv::Scalar(0, 0, 0));//smooth reordered
   int size_3c = image_upsample.rows*image_upsample.cols*c;
   //TicToc allocate;
   // double* ima3d = (double*)malloc(sizeof(double)*(size_3c));
@@ -928,42 +929,44 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       }
       hz = 1.0/(cur_setfre - last_setfre);
       ROS_DEBUG_STREAM("hz = "<<hz);
-      if(hz<2.1 && hz>0){
+      if(hz<0.9 && hz>0){
         last_setfre = cur_setfre;
         ROS_DEBUG_STREAM("save iamge");
         
         char png_name_upsampling[200];
         char png_name[200];
-        sprintf(png_name_upsampling, "/media/mao/PortableSSD/Dataset/mpc_dataset/dataset_20230519/%05dimg_x_2.png", i_pc_count);
-        sprintf(png_name, "/media/mao/PortableSSD/Dataset/mpc_dataset/dataset_20230519/%05dimg_x.png", i_pc_count);
-        i_pc_count ++;
+        sprintf(png_name_upsampling, "/media/mao/PortableSSD/yolo_train/test_set/data/LL_ex9_xyzrgb/resolution_10/%05dtest_2.png", i_pc_count);
+        sprintf(png_name, "/media/mao/PortableSSD/yolo_train/test_set/data/LL_ex9_xyzrgb/resolution_10/%05dtest.png", i_pc_count);
         
-        //cv::cvtColor(image_upsample, image_upsample_grey, cv::COLOR_BGR2GRAY);
-        //cv::imshow("image_upsample", image_upsample_grey);
-        //cv::namedWindow("image_upsample", cv::WINDOW_NORMAL);
-        //cv::imshow("image_upsample", image_upsample);
-        //cv::namedWindow("image", cv::WINDOW_NORMAL);
-        //cv::imshow("image", img_cur);
         cv::imwrite(png_name_upsampling, image_upsample_original); //save the image
         cv::imwrite(png_name, img_cur); 
-        //cv::waitKey(1);
-        // cv::Mat channel[3];
-        // cv::split(image_upsample, channel);//split into three channels
-        
-        // char pic1[50];
-        // char pic2[50];
-        // char pic3[50];
-        // sprintf(pic1, "/tmp/%02dupsamplesave_0.png",nof);
-        // sprintf(pic2, "/tmp/%02dupsamplesave_1.png",nof);
-        // sprintf(pic3, "/tmp/%02dupsamplesave_2.png",nof);
-        
-        // cv::imshow("x of image_upsample", channel[0]);
-        //cv::imwrite(pic1, channel[0]); //save the image
-        // cv::imshow("y of image_upsample", channel[1]);
-        //cv::imwrite(pic2, channel[1]); //save the image
-        // cv::imshow("z of image_upsample", channel[2]);
-        //cv::imwrite(pic3, channel[2]); //save the image
-        //cv::destroyAllWindows();
+
+        if(compare_upsampling){
+          char xyz_smooth[200];
+          char png_name1[200];
+          sprintf(xyz_smooth, "/media/mao/PortableSSD/yolo_train/test_set/data/LL_ex9_xyzrgb/smooth/%05dtest_2.png", i_pc_count);
+          sprintf(png_name1, "/media/mao/PortableSSD/yolo_train/test_set/data/LL_ex9_xyzrgb/smooth/%05dtest.png", i_pc_count);
+          cv::imwrite(png_name1, img_cur); 
+          cv::imwrite(xyz_smooth, image_upsample_original); 
+        }
+        if(resolution_cmp){
+          char png_name2[200];
+          char xyz_1[200];
+          char xyz_02[200];
+          sprintf(xyz_1, "/media/mao/PortableSSD/yolo_train/test_set/data/LL_ex9_xyzrgb/resolution_1/%05dtest_2.png", i_pc_count);
+          sprintf(png_name2, "/media/mao/PortableSSD/yolo_train/test_set/data/LL_ex9_xyzrgb/resolution_1/%05dtest.png", i_pc_count);
+          cv::imwrite(png_name2, img_cur); 
+          char png_name3[200];
+
+          sprintf(xyz_02, "/media/mao/PortableSSD/yolo_train/test_set/data/LL_ex9_xyzrgb/resolution_5/%05dtest_2.png", i_pc_count);
+          sprintf(png_name3, "/media/mao/PortableSSD/yolo_train/test_set/data/LL_ex9_xyzrgb/resolution_5/%05dtest.png", i_pc_count);
+          cv::imwrite(png_name3, img_cur); 
+          cv::imwrite(xyz_1, image_upsample_1); 
+          cv::imwrite(xyz_02, image_upsample_5); 
+         
+        }
+        i_pc_count ++;
+
       }
         
     }
@@ -1024,6 +1027,13 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
       if(ifdetection){
         cv::circle(image_upsample, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
         cv::circle(img_cur, circle_center, search_box_yolo, cv::Scalar(0, 255, 0));
+        if(get_yolo_update){
+          cv::circle(image_upsample, unrect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+          cv::circle(img_cur, unrect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+          cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(255, 0, 0));
+          cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(255, 0, 0));
+          get_yolo_update = 0;
+        }
       }
       if(plot_box){
         cv::rectangle(image_upsample, rect_left, rect_right, cv::Scalar(255, 0, 255), 2);
@@ -1036,8 +1046,8 @@ int upsampling_pro( pcl::PointXYZ &maxxyz, pcl::PointXYZ &minxyz, minmaxuv_ &min
         plot_box = 0;
       }
       m_feature.unlock();
-      // cv::circle(image_upsample, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
-      // cv::circle(img_cur, rect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      // cv::circle(image_upsample, unrect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
+      // cv::circle(img_cur, unrect_circle_center, search_box_yolo, cv::Scalar(0, 0, 255));
       cv::imshow("XYZ_resolution_0.1", image_upsample);
       cv::imshow("RGB", img_cur);
       cv::waitKey(1);

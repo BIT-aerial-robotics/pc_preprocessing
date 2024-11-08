@@ -1,6 +1,6 @@
 <launch>
-    <node name="pc_prep" pkg="pc_preprocessing" type="pc_prep" output="screen">
-        <param name="setting" type="string" value="$(find pc_preprocessing)/setting/parameter.yaml" />
+    <node name="pc_sim" pkg="pc_simulation" type="pc_sim" output="screen">
+        <param name="setting" type="string" value="$(find pc_simulation)/setting/parameter.yaml" />
     </node>
 <!--
     <node pkg="rosbag" type="play" name="player" output="log" 
